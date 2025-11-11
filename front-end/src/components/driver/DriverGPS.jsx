@@ -1,39 +1,67 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { io } from "socket.io-client";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { useIsMobile } from "../ui/use-mobile";
 import { LeafletMap } from "../map/LeafletMap";
 import { Navigation, MapPin, Gauge, Clock, Route } from "lucide-react";
 
-export default function DriverGPS({ vehicleId }) {
+export default function DriverGPS({ vehicleId, socket }) {
   const [currentLocation, setCurrentLocation] = useState({
-    lat: 10.8231,
+    lat: 10.8231, // Vị trí mặc định
     lng: 106.6297,
     speed: 35,
     timestamp: new Date(),
   });
 
   const [isTracking, setIsTracking] = useState(true);
+  const [otherBuses, setOtherBuses] = useState({}); // State để lưu vị trí các xe khác
   const isMobile = useIsMobile();
 
-  // Mock GPS tracking simulation
+  // Real-time GPS tracking using Geolocation API and Socket.IO
   useEffect(() => {
-    if (!isTracking) return;
+    if (!isTracking || !socket) return;
 
-    const interval = setInterval(() => {
-      setCurrentLocation((prev) => ({
-        lat: prev.lat + (Math.random() - 0.5) * 0.001,
-        lng: prev.lng + (Math.random() - 0.5) * 0.001,
-        speed: Math.max(
-          0,
-          Math.min(60, prev.speed + (Math.random() - 0.5) * 10)
-        ),
-        timestamp: new Date(),
-      }));
-    }, 3000);
+    // 2. Lắng nghe vị trí của các xe khác
+    socket.on("bus_location_broadcast", (data) => {
+      console.log("Vị trí mới từ xe khác:", data);
+      if (data.bus_id !== vehicleId) {
+        setOtherBuses(prev => ({
+          ...prev,
+          [data.bus_id]: { lat: data.latitude, lng: data.longitude }
+        }));
+      }
+    });
 
-    return () => clearInterval(interval);
-  }, [isTracking]);
+    // 3. Lấy vị trí của tài xế và gửi lên server
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude, speed } = position.coords;
+        const newLocation = {
+          lat: latitude,
+          lng: longitude,
+          speed: speed ? speed * 3.6 : 0, // m/s to km/h
+          timestamp: new Date(),
+        };
+        setCurrentLocation(newLocation);
+
+        // Gửi vị trí lên server
+        socket.emit("bus_location_update", {
+          bus_id: vehicleId,
+          latitude: latitude,
+          longitude: longitude,
+        });
+      },
+      (error) => console.error("Lỗi lấy vị trí GPS:", error),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
+    // Cleanup khi component unmount hoặc khi socket/tracking thay đổi
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      socket.off("bus_location_broadcast");
+    };
+  }, [isTracking, vehicleId, socket]);
 
   const upcomingStops = [
     {
@@ -41,24 +69,28 @@ export default function DriverGPS({ vehicleId }) {
       distance: 1.2,
       estimatedTime: "2 phút",
       type: "pickup",
+      position: { lat: 10.7917, lng: 106.7028 }
     },
     {
       name: "Cầu Sài Gòn",
       distance: 3.5,
       estimatedTime: "6 phút",
       type: "pickup",
+      position: { lat: 10.7968, lng: 106.7196 }
     },
     {
       name: "Chợ Thủ Đức",
       distance: 7.8,
       estimatedTime: "12 phút",
       type: "dropoff",
+      position: { lat: 10.8494, lng: 106.7537 }
     },
     {
       name: "Trường THPT Nguyễn Du",
       distance: 12.5,
       estimatedTime: "18 phút",
       type: "dropoff",
+      position: { lat: 10.7783, lng: 106.6983 }
     },
   ];
 
@@ -71,48 +103,35 @@ export default function DriverGPS({ vehicleId }) {
   // Markers for the map
   const mapMarkers = useMemo(
     () => [
+      // Vị trí xe hiện tại
       {
         id: "current-vehicle",
         position: currentLocation,
-        title: `Xe ${vehicleId}`,
-        type: "bus",
+        title: `Xe ${vehicleId} (Bạn)`,
+        type: "bus-current",
       },
+      // Các điểm dừng sắp tới
       ...upcomingStops.map((stop, index) => ({
         id: `stop-${index}`,
-        position: {
-          lat: currentLocation.lat + (Math.random() - 0.5) * 0.01,
-          lng: currentLocation.lng + (Math.random() - 0.5) * 0.01,
-        },
+        position: stop.position,
         title: stop.name,
         type: stop.type === "pickup" ? "stop" : "school",
       })),
+      // Vị trí các xe khác
+      ...Object.entries(otherBuses).map(([busId, pos]) => ({
+        id: `bus-${busId}`,
+        position: pos,
+        title: `Xe ${busId}`,
+        type: "bus",
+      }))
     ],
-    [currentLocation, upcomingStops, vehicleId]
+    [currentLocation, upcomingStops, vehicleId, otherBuses]
   );
 
-  // Routes for the map
+  // Routes for the map (để trống vì không có dữ liệu tuyến đường thực tế)
   const mapRoutes = useMemo(
-    () => [
-      {
-        id: "current-route",
-        path: [
-          currentLocation,
-          {
-            lat: currentLocation.lat + 0.005,
-            lng: currentLocation.lng + 0.005,
-          },
-          { lat: currentLocation.lat + 0.01, lng: currentLocation.lng + 0.01 },
-          {
-            lat: currentLocation.lat + 0.015,
-            lng: currentLocation.lng + 0.005,
-          },
-        ],
-        color: "#3b82f6",
-        strokeWeight: 4,
-        title: "Tuyến hiện tại",
-      },
-    ],
-    [currentLocation]
+    () => [],
+    []
   );
 
   return (
@@ -182,6 +201,7 @@ export default function DriverGPS({ vehicleId }) {
       >
         {/* Map Container */}
         <div className="lg:col-span-2">
+          {/* Đây là nơi component LeafletMap được "gắn vào" và hiển thị */}
           <LeafletMap
             height={isMobile ? "400px" : "600px"}
             center={currentLocation}

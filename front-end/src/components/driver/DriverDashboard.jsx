@@ -14,11 +14,16 @@ import {
   Gauge,
 } from "lucide-react";
 
-export default function DriverDashboard({
-  driverInfo,
-  currentVehicle,
-  driverStatus,
-}) {
+export default function DriverDashboard({ driverInfo, currentVehicle, driverStatus }) {
+  // Nếu dữ liệu chưa có -> hiển thị thông báo chờ
+  if (!driverInfo || !currentVehicle) {
+    return (
+      <div className="flex justify-center items-center h-64 text-gray-500">
+        Đang tải dữ liệu tài xế...
+      </div>
+    );
+  }
+
   const currentSchedule = {
     id: "LT001",
     startTime: "07:00",
@@ -37,7 +42,7 @@ export default function DriverDashboard({
 
   return (
     <div className="space-y-6">
-      {/* Driver Info Card */}
+      {/* Thông tin tài xế */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -50,41 +55,44 @@ export default function DriverDashboard({
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <span className="font-medium min-w-[100px]">Họ tên:</span>
-                <span>{driverInfo.name}</span>
+                <span>{driverInfo?.username || "—"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-medium min-w-[100px]">Mã tài xế:</span>
-                <Badge variant="outline">{driverInfo.id}</Badge>
+                <Badge variant="outline">{driverInfo?.id || "—"}</Badge>
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4" />
                 <span className="font-medium min-w-[100px]">Điện thoại:</span>
-                <span>{driverInfo.phone}</span>
+                <span>{driverInfo?.phone_number || "—"}</span>
               </div>
             </div>
+
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
+              {/* <div className="flex items-center gap-2">
                 <CreditCard className="w-4 h-4" />
                 <span className="font-medium min-w-[100px]">Số GPLX:</span>
-                <span>{driverInfo.licenseNumber}</span>
-              </div>
+                <span>{driverInfo?.licenseNumber || "—"}</span>
+              </div> */}
               <div className="flex items-center gap-2">
                 <span className="font-medium min-w-[100px]">Giới tính:</span>
-                <span>{driverInfo.gender}</span>
+                <span>{driverInfo?.sex || "—"}</span>
               </div>
-              <div className="flex items-center gap-2">
+              {/* <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 <span className="font-medium min-w-[100px]">Ngày sinh:</span>
                 <span>
-                  {new Date(driverInfo.birthDate).toLocaleDateString("vi-VN")}
+                  {driverInfo?.birthDate
+                    ? new Date(driverInfo.birthDate).toLocaleDateString("vi-VN")
+                    : "—"}
                 </span>
-              </div>
+              </div> */}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Current Vehicle Card */}
+      {/* Xe đang phụ trách */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -98,30 +106,30 @@ export default function DriverDashboard({
               <div className="flex items-center gap-2">
                 <span className="font-medium min-w-[100px]">Biển số:</span>
                 <Badge className="bg-blue-100 text-blue-800">
-                  {currentVehicle.licensePlate}
+                  {currentVehicle?.licensePlate || "—"}
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-medium min-w-[100px]">Hãng xe:</span>
-                <span>{currentVehicle.brand}</span>
+                <span>{currentVehicle?.brand || "—"}</span>
               </div>
             </div>
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <span className="font-medium min-w-[100px]">Số ghế:</span>
-                <span>{currentVehicle.seats} chỗ</span>
+                <span>{currentVehicle?.seats || "—"} chỗ</span>
               </div>
               <div className="flex items-center gap-2">
                 <Gauge className="w-4 h-4" />
                 <span className="font-medium min-w-[100px]">Tốc độ TB:</span>
-                <span>{currentVehicle.avgSpeed} km/h</span>
+                <span>{currentVehicle?.avgSpeed || 0} km/h</span>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Current Schedule Card */}
+      {/* Lịch trình hiện tại */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -137,9 +145,7 @@ export default function DriverDashboard({
                 {currentSchedule.startTime} - {currentSchedule.endTime}
               </span>
             </div>
-            <Badge className="bg-green-100 text-green-800">
-              Đang hoạt động
-            </Badge>
+            <Badge className="bg-green-100 text-green-800">Đang hoạt động</Badge>
           </div>
 
           <div className="flex items-start gap-2">
@@ -162,7 +168,7 @@ export default function DriverDashboard({
         </CardContent>
       </Card>
 
-      {/* Today's Stats */}
+      {/* Thống kê hôm nay */}
       <div className="grid md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">

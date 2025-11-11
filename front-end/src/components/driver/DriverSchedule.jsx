@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import {
   Table,
   TableBody,
@@ -27,14 +26,15 @@ import {
   MapPin,
   Search,
   Eye,
-  Navigation,
+  CheckCircle,
 } from "lucide-react";
+import { Input } from "../ui/input";
 
-export default function DriverSchedule({ driverId }) {
+export default function DriverSchedule({ onAcceptSchedule, activeScheduleId }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSchedule, setSelectedSchedule] = useState(null);
 
-  const schedules = [
+  const [schedules, setSchedules] = useState([
     {
       id: "LT001",
       date: "2024-12-19",
@@ -42,7 +42,7 @@ export default function DriverSchedule({ driverId }) {
       endTime: "17:00",
       route: "Tuyến 1: Bến xe Miền Đông - Trường THPT Nguyễn Du",
       vehiclePlate: "29A-12345",
-      status: "active",
+      status: "completed", // Giả sử chuyến này đã hoàn thành
       totalDistance: 45,
       estimatedTime: "8h 30m",
     },
@@ -53,7 +53,7 @@ export default function DriverSchedule({ driverId }) {
       endTime: "16:30",
       route: "Tuyến 2: Bến xe An Sương - Trường THCS Lê Quý Đôn",
       vehiclePlate: "29A-12345",
-      status: "scheduled",
+      status: "pending", // Thay đổi trạng thái để nút "Nhận" hiển thị
       totalDistance: 38,
       estimatedTime: "7h 45m",
     },
@@ -79,7 +79,7 @@ export default function DriverSchedule({ driverId }) {
       totalDistance: 45,
       estimatedTime: "8h 30m",
     },
-  ];
+  ]);
 
   const routeDetails = {
     LT001: {
@@ -99,12 +99,27 @@ export default function DriverSchedule({ driverId }) {
     },
   };
 
+  // Sử dụng useEffect để cập nhật trạng thái một cách an toàn khi activeScheduleId thay đổi
+  useEffect(() => {
+    if (activeScheduleId) {
+      setSchedules((prevSchedules) =>
+        prevSchedules.map((schedule) =>
+          schedule.id === activeScheduleId
+            ? { ...schedule, status: "active" }
+            : schedule
+        )
+      );
+    }
+  }, [activeScheduleId]);
+
   const getStatusBadge = (status) => {
     switch (status) {
       case "active":
         return (
           <Badge className="bg-green-100 text-green-800">Đang thực hiện</Badge>
         );
+      case "pending":
+        return <Badge className="bg-yellow-100 text-yellow-800">Chờ nhận</Badge>;
       case "scheduled":
         return <Badge className="bg-blue-100 text-blue-800">Đã lên lịch</Badge>;
       case "completed":
@@ -116,12 +131,14 @@ export default function DriverSchedule({ driverId }) {
     }
   };
 
-  const filteredSchedules = schedules.filter(
-    (schedule) =>
+  const filteredSchedules = schedules.filter((schedule) => {
+    if (!searchTerm) return true; // Hiển thị tất cả nếu không có từ khóa tìm kiếm
+    return (
       schedule.route.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      schedule.vehiclePlate.includes(searchTerm.toLowerCase()) ||
+      schedule.vehiclePlate.toLowerCase().includes(searchTerm.toLowerCase()) ||
       schedule.date.includes(searchTerm)
-  );
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -312,6 +329,15 @@ export default function DriverSchedule({ driverId }) {
                         )}
                       </DialogContent>
                     </Dialog>
+                    {schedule.status === "pending" && (
+                      <Button
+                        size="sm"
+                        onClick={() => onAcceptSchedule(schedule)}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Nhận
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

@@ -65,7 +65,6 @@ export function LoginForm({ onLogin }) {
           manager: "Quản lý",
           parent: "Phụ huynh",
         };
-
         system.login(roleNames[account.role]);
         onLogin(account.role);
       } else {
