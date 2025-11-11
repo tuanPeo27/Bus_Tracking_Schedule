@@ -87,7 +87,7 @@ export function ParentDashboard({ parentInfo, studentInfo }) {
         )}
       </div>
 
-      {/* Tác vụ nhanh */}
+      {/* Tác vụ nhanh
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="cursor-pointer hover:shadow-md transition-shadow">
           <CardContent className="p-4 text-center">
@@ -108,7 +108,7 @@ export function ParentDashboard({ parentInfo, studentInfo }) {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </div> */}
     </div>
   );
 }
