@@ -69,11 +69,10 @@ export default function DriverDashboard({ driverInfo, currentVehicle, driverStat
             </div>
 
             <div className="space-y-3">
-              {/* <div className="flex items-center gap-2">
-                <CreditCard className="w-4 h-4" />
-                <span className="font-medium min-w-[100px]">Số GPLX:</span>
-                <span>{driverInfo?.licenseNumber || "—"}</span>
-              </div> */}
+              <div className="flex items-center gap-2">
+                <span className="font-medium min-w-[100px]">Địa chỉ:</span>
+                <span>{driverInfo?.address || "—"}</span>
+              </div>
               <div className="flex items-center gap-2">
                 <span className="font-medium min-w-[100px]">Giới tính:</span>
                 <span>{driverInfo?.sex || "—"}</span>

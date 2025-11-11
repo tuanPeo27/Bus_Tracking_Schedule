@@ -1,10 +1,8 @@
 import instance from "../setup/axios";
 
-const getInfoDriver = async () => {
-    return instance.get(`drivers/`);
+const getInfoDriver = async (id) => {
+    return instance.get(`drivers/${id}`);
 }
 
 
-
-
-export { getInfoDriver };
+export { getInfoDriver  };

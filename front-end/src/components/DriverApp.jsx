@@ -29,6 +29,7 @@ import DriverStatus from "./driver/DriverStatus";
 import DriverStudents from "./driver/DriverStudents";
 import { ChangePassword } from "./ChangePassword";
 import { getInfoDriver } from "../service/driverService";
+import Cookies from "js-cookie";
 
 export function DriverApp({ onBack }) {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -43,9 +44,9 @@ export function DriverApp({ onBack }) {
   // 🚗 Lấy thông tin tài xế từ server
   const getDriverInfo = async () => {
     try {
-      const res = await getInfoDriver();
+      const res = await getInfoDriver(Cookies.get("user_id"));
       if (res && res.data.EC === 0) {
-        setDriverInfo(res.data.DT[1]);
+        setDriverInfo(res.data.DT);
         console.log("Thông tin tài xế:", res.data.DT);
       } else {
         console.error("Lỗi lấy thông tin tài xế:", res?.data?.EM);
