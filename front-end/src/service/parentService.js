@@ -1,7 +1,7 @@
 import instance from "../setup/axios";
 
 const getInfoParent = async () => {
-    return instance.get(`parent/info`);
+    return instance.get(`parents/`);
     // const parentInfo = {
     //     id: 'PH001',
     //     name: 'Bà Nguyễn Thị Lan',
@@ -19,8 +19,11 @@ const getInfoParent = async () => {
     //     ]
     //   };
 }
+const getInfoStudent = async () => {
+    return instance.get(`students/`);
+}
 
 
 
 
-export { getInfoParent };
+export { getInfoParent, getInfoStudent };

@@ -48,20 +48,24 @@ export function LoginForm({ onLogin }) {
 
     try {
       const res = await userLogin({ username, password });
+      console.log(res.data.DT);
+
       if (res && res.data.EC === 0) {
         const account = res.data.DT.user;
-        const access_token = res.data.DT.access_token;
-        Cookies.set("access_token", account.access_token, {
+        const access_token = res.data.DT.token;
+
+        Cookies.set("access_token", access_token, {
           expires: 1 / 24,
-          secure: true,
-          sameSite: "strict",
+          secure: window.location.protocol === "https:",
+          sameSite: "lax",
         });
+
         const roleNames = {
           driver: "Tài xế",
           manager: "Quản lý",
           parent: "Phụ huynh",
         };
-        console.log(account);
+
         system.login(roleNames[account.role]);
         onLogin(account.role);
       } else {
