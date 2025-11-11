@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import Cookies from "js-cookie";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -40,7 +40,7 @@ export function ParentApp({ onBack }) {
 
   const getParent = async () => {
     try {
-      const res = await getInfoParent();
+      const res = await getInfoParent(Cookies.get("user_id"));
       if (res && res.data.EC === 0) {
         setParentInfo(res.data.DT);
       }
@@ -51,7 +51,7 @@ export function ParentApp({ onBack }) {
 
   const getStudent = async () => {
     try {
-      const res = await getInfoStudent();
+      const res = await getInfoStudent(Cookies.get("user_id"));
       if (res && res.data.EC === 0) {
         setStudentInfo(res.data.DT);
       }
@@ -100,7 +100,7 @@ export function ParentApp({ onBack }) {
                 <div className="text-right">
                   <p className="font-medium">{parentInfo.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {parentInfo.children?.length ?? 0} con em
+                    {studentInfo.length ?? 0} con em
                   </p>
                 </div>
               )}
@@ -171,7 +171,7 @@ export function ParentApp({ onBack }) {
                 )}
               </TabsTrigger>
 
-              <TabsTrigger
+              {/* <TabsTrigger
                 value="messages"
                 className={`${
                   isMobile ? "flex-col gap-1 min-w-[60px] text-xs" : "gap-2"
@@ -179,7 +179,7 @@ export function ParentApp({ onBack }) {
               >
                 <MessageSquare className="w-4 h-4" />
                 {isMobile ? "T.nhắn" : "Tin nhắn"}
-              </TabsTrigger>
+              </TabsTrigger> */}
 
               <TabsTrigger
                 value="password"
@@ -213,9 +213,9 @@ export function ParentApp({ onBack }) {
             <ParentNotifications parentId={parentInfo.id} />
           </TabsContent>
 
-          <TabsContent value="messages" className="mt-0">
+          {/* <TabsContent value="messages" className="mt-0">
             <ParentMessages parentId={parentInfo.id} />
-          </TabsContent>
+          </TabsContent> */}
 
           <TabsContent value="password" className="mt-0">
             <ChangePassword username="phuhuynh01" userRole="parent" />

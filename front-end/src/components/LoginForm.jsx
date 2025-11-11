@@ -60,6 +60,10 @@ export function LoginForm({ onLogin }) {
           sameSite: "lax",
         });
 
+        Cookies.set("user_id", account.id, {
+          expires: 1 / 24,
+        });
+
         const roleNames = {
           driver: "Tài xế",
           manager: "Quản lý",
