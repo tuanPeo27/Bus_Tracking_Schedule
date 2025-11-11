@@ -5,9 +5,7 @@ import { Avatar, AvatarFallback } from "../ui/avatar";
 import { User, School, Phone, Bell } from "lucide-react";
 
 export function ParentDashboard({ parentInfo, studentInfo }) {
-  const parent =
-    Array.isArray(parentInfo) && parentInfo.length > 0 ? parentInfo[0] : null;
-
+  const parent = parentInfo;
   const students = React.useMemo(() => {
     return Array.isArray(studentInfo)
       ? studentInfo
