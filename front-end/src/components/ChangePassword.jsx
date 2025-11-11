@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "./ui/alert";
 import { Eye, EyeOff, CheckCircle, AlertCircle, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { useIsMobile } from "./ui/use-mobile";
-import { userChangePassword } from "../service/loginLogoutForget";
+import { userChangePassword } from "../service/loginChange";
 
 export function ChangePassword({ username, userRole }) {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -47,8 +47,10 @@ export function ChangePassword({ username, userRole }) {
 
     setIsLoading(true);
     try {
+      const id = Cookies.get("user_id");
       const response = await userChangePassword({
-        oldPassword: currentPassword,
+        id,
+        prePassword: currentPassword,
         newPassword,
       });
 
