@@ -481,46 +481,7 @@ export default function ManagerSchedules() {
         </CardContent>
       </Card>
 
-      {/* Weekly Schedule View */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Lịch trình tuần này</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-7 gap-2">
-            {[
-              "Thứ 2",
-              "Thứ 3",
-              "Thứ 4",
-              "Thứ 5",
-              "Thứ 6",
-              "Thứ 7",
-              "Chủ nhật",
-            ].map((day, index) => (
-              <div key={index} className="border rounded-lg p-3">
-                <h4 className="font-medium text-center mb-2">{day}</h4>
-                <div className="space-y-2">
-                  {schedules
-                    .filter(
-                      (s) => new Date(s.date).getDay() === (index + 1) % 7
-                    )
-                    .map((schedule) => (
-                      <div
-                        key={schedule.id}
-                        className="p-2 bg-blue-50 rounded text-xs"
-                      >
-                        <p className="font-medium">{schedule.startTime}</p>
-                        <p className="text-muted-foreground truncate">
-                          {schedule.route.split(":")[0]}
-                        </p>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

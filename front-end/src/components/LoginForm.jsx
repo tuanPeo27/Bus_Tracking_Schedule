@@ -66,7 +66,7 @@ export function LoginForm({ onLogin }) {
 
         const roleNames = {
           driver: "Tài xế",
-          manager: "Quản lý",
+          admin: "Quản lý",
           parent: "Phụ huynh",
         };
 

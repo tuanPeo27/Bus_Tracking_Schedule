@@ -17,6 +17,7 @@ const routeRoutes = require("./routes/routeRoutes");
 const parentRoutes = require("./routes/parentRoutes");
 const scheduleRoutes = require("./routes/scheduleRoutes");
 const busStopRoutes = require("./routes/busStopRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 
 const bodyParser = require("body-parser");
 
@@ -36,6 +37,7 @@ app.use("/api/routes", routeRoutes);
 app.use("/api/parents", parentRoutes);
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/busstops", busStopRoutes);
+app.use("/api/admin", adminRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -159,9 +161,8 @@ io.on("connection", (socket) => {
         return;
       }
 
-      const message = `Học sinh ${student.name} đã được trả tại điểm ${
-        student.dropoff_point
-      } an toan vào lúc ${new Date().toLocaleTimeString()}.`;
+      const message = `Học sinh ${student.name} đã được trả tại điểm ${student.dropoff_point
+        } an toan vào lúc ${new Date().toLocaleTimeString()}.`;
 
       console.log(
         `Gửi thông báo đến phụ huynh (${parent.username}): ${message}`
