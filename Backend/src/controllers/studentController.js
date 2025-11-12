@@ -1,3 +1,4 @@
+const Schedule = require("../models/schedule");
 const Student = require("../models/student");
 
 exports.getAllStudents = async (req, res) => {
@@ -41,6 +42,31 @@ exports.getStudentsByRouteId = async (req, res) => {
     res.status(200).json({
       EC: 0,
       EM: "Lấy danh sách học sinh theo tuyến đường thành công.",
+      DT: students,
+    });
+  } catch (error) {
+    console.error("Lỗi lấy danh sách học sinh theo tuyến đường:", error);
+    res.status(500).json({ EC: -1, EM: "Lỗi server.", DT: null });
+  }
+};
+
+exports.getStudentsByParentId = async (req, res) => {
+  try {
+    const parentId = req.params.id;
+    const students = await Student.findAll({
+      where: { parent_id: parentId },
+      attributes: [
+        "id",
+        "name",
+        "age",
+        "school",
+        "pickup_point",
+        "dropoff_point",
+      ],
+    });
+    res.status(200).json({
+      EC: 0,
+      EM: "Lấy danh sách học sinh theo phụ huynh thành công.",
       DT: students,
     });
   } catch (error) {
@@ -139,6 +165,52 @@ exports.deleteStudentById = async (req, res) => {
     res.status(200).json({ EC: 0, EM: "Xóa học sinh thành công.", DT: null });
   } catch (error) {
     console.error("Lỗi xóa học sinh:", error);
+    res.status(500).json({ EC: -1, EM: "Lỗi server.", DT: null });
+  }
+};
+
+exports.getStudentsByScheduleId = async (req, res) => {
+  try {
+    const scheduleId = req.params.id;
+    console.log("🔍 Lấy danh sách học sinh theo lịch trình:", scheduleId);
+
+    const schedule = await Schedule.findOne({
+      where: { id: scheduleId },
+      attributes: ["id", "route_id", "bus_id", "driver_id"],
+    });
+
+    if (!schedule) {
+      return res.status(404).json({
+        EC: 1,
+        EM: "Không tìm thấy lịch trình.",
+        DT: null,
+      });
+    }
+
+    const students = await Student.findAll({
+      where: { route_id: schedule.route_id },
+      attributes: [
+        "id",
+        "name",
+        "age",
+        "school",
+        "pickup_point",
+        "dropoff_point",
+      ],
+      order: [["name", "ASC"]],
+    });
+
+    res.status(200).json({
+      EC: 0,
+      EM: "Lấy danh sách học sinh theo lịch trình thành công.",
+      DT: {
+        schedule_id: schedule.id,
+        route_id: schedule.route_id,
+        students: students,
+      },
+    });
+  } catch (error) {
+    console.error("Lỗi lấy danh sách học sinh theo lịch trình:", error);
     res.status(500).json({ EC: -1, EM: "Lỗi server.", DT: null });
   }
 };

@@ -2,7 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
 
-const SECRET_KEY = "bus_tracking_secret";
+const SECRET_KEY = process.env.JWT_SECRET || "secret_key";
 
 exports.login = async (req, res) => {
   try {
@@ -52,9 +52,9 @@ exports.login = async (req, res) => {
 
 exports.forgotPass = async (req, res) => {
   try {
-    const { username, prePassword, newPassword } = req.body;
+    const { id, prePassword, newPassword } = req.body;
 
-    if (!username || !prePassword || !newPassword) {
+    if (!id || !prePassword || !newPassword) {
       return res.status(400).json({
         EC: 1,
         EM: "Thiếu email hoặc mật khẩu cũ hoặc mật khẩu mới.",
@@ -62,7 +62,7 @@ exports.forgotPass = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ where: { username } });
+    const user = await User.findOne({ where: { id } });
     if (!user) {
       return res.status(404).json({
         EC: 1,
@@ -91,6 +91,36 @@ exports.forgotPass = async (req, res) => {
       EM: "Lỗi server khi đặt lại mật khẩu.",
       DT: null,
     });
+  }
+};
+
+exports.createAdmin = async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res
+        .status(400)
+        .json({ EC: 1, EM: "Thiếu tên quản lý hoặc mật khẩu.", DT: null });
+    }
+
+    const user = await User.findOne({ where: { username } });
+    if (user) {
+      return res
+        .status(400)
+        .json({ EC: 1, EM: "Tên quản lý đã tồn tại.", DT: null });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const driver = await User.create({
+      username: username,
+      password_hash: hashedPassword,
+      role: "admin",
+    });
+    res.status(201).json({ EC: 0, EM: "Thêm quản lý thành công", DT: driver });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ EC: -1, EM: "Không thể thêm quản lý", DT: null });
   }
 };
 
