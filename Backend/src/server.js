@@ -23,7 +23,7 @@ const bodyParser = require("body-parser");
 
 const app = express();
 
-app.use(cors());
+app.use(cors("*"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -42,6 +42,8 @@ app.use("/api/admin", adminRoutes);
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*" },
+  path: "/socket.io",
+  transports: ["websocket", "polling"],
 });
 
 io.on("connection", (socket) => {
@@ -60,7 +62,7 @@ io.on("connection", (socket) => {
         where: { id: driverId, role: "driver" },
       });
       if (!driver) {
-        console.error("Tài xế không tồn tại:", driverId);
+        console.log("Tài xế không tồn tại:", driverId);
         socket.emit("incident-response", {
           EC: -1,
           EM: "Tài xế không tồn tại.",
@@ -86,6 +88,11 @@ io.on("connection", (socket) => {
         EM: "Lỗi server khi gửi sự cố.",
       });
     }
+  });
+
+  socket.on("joinParentRoom", async (data) => {
+    console.log(data);
+    io.emit(`parent-notify-${data.parentId}`, "Tuan-kun");
   });
 
   socket.on("bus-location", async (data) => {
@@ -184,6 +191,6 @@ io.on("connection", (socket) => {
 
 app.get("/", (req, res) => res.send("SchoolBus backend is running!"));
 
-app.listen(process.env.PORT, () => {
+server.listen(process.env.PORT, () => {
   console.log(`Server running on port ${process.env.PORT}`);
 });

@@ -25,12 +25,13 @@ import { getInfoParent, getInfoStudent } from "../service/parentService";
 
 export function ParentApp({ onBack }) {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [unreadCount] = useState(3);
   const { system } = useNotificationHelpers();
   const { clearAll } = useNotifications();
   const isMobile = useIsMobile();
   const [parentInfo, setParentInfo] = useState("");
   const [studentInfo, setStudentInfo] = useState("");
+  const { notificationsList = [] } = useNotifications();
+  const unreadCount = notificationsList.filter((n) => !n.isRead).length;
 
   const handleLogout = () => {
     clearAll();

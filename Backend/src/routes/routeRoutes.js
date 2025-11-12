@@ -1,13 +1,34 @@
 const express = require("express");
 const router = express.Router();
 const routeController = require("../controllers/routeController");
+const { verifyToken, authorizeAdmin } = require("../middleware/authMiddleware");
 
-router.get("/", routeController.getAllRoutes);
-router.get("/:id", routeController.getRouteById);
-router.post("/create", routeController.createRoute);
-router.put("/edit", routeController.editRoute);
-router.put("/edit/:id", routeController.editRouteById);
-router.delete("/delete", routeController.deleteRoute);
-router.delete("/delete/:id", routeController.deleteRouteById);
+router.get("/", verifyToken, routeController.getAllRoutes);
+router.get("/:id", verifyToken, routeController.getRouteById);
+router.post(
+  "/create",
+  verifyToken,
+  authorizeAdmin,
+  routeController.createRoute
+);
+router.put("/edit", verifyToken, authorizeAdmin, routeController.editRoute);
+router.put(
+  "/edit/:id",
+  verifyToken,
+  authorizeAdmin,
+  routeController.editRouteById
+);
+router.delete(
+  "/delete",
+  verifyToken,
+  authorizeAdmin,
+  routeController.deleteRoute
+);
+router.delete(
+  "/delete/:id",
+  verifyToken,
+  authorizeAdmin,
+  routeController.deleteRouteById
+);
 
 module.exports = router;
