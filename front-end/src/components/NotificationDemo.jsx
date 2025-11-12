@@ -1,79 +1,40 @@
-import React, { useEffect, useRef } from 'react';
-import { useNotificationHelpers } from './useNotificationHelpers';
+import React, { useEffect, useRef } from "react";
+import { useNotificationHelpers } from "./useNotificationHelpers";
+import { fetchNotifications } from "../service/notifications";
 
 export function NotificationDemo({ userRole, loginKey }) {
   const { system, showInfo, showWarning } = useNotificationHelpers();
-  const executedRef = useRef('');
+  const executedRef = useRef("");
 
   useEffect(() => {
-    // Chỉ chạy demo nếu loginKey khác với lần trước
+    // Chỉ chạy lại nếu loginKey thay đổi
     if (executedRef.current === loginKey) return;
     executedRef.current = loginKey;
 
-    // Demo notifications based on user role
-    const setupNotifications = () => {
-      switch (userRole) {
-        case 'driver':
-          // Driver-specific notifications
-          setTimeout(() => {
-            system.scheduleReminder('07:30', 'Tuyến 1: Bến xe Miền Đông - Trường THPT Nguyễn Du');
-          }, 2000);
-          
-          setTimeout(() => {
-            system.studentCheckIn('Nguyễn Văn An');
-          }, 5000);
+    // const fetchNotifications = async () => {
+    //   try {
+    //     const response = await fetchNotifications(userRole);
 
-          setTimeout(() => {
-            system.locationUpdated();
-          }, 8000);
-          break;
+    //     const data = response.data.DT;
 
-        case 'manager':
-          // Manager-specific notifications
-          setTimeout(() => {
-            showInfo(
-              'Hệ thống hoạt động bình thường', 
-              'Tất cả xe buýt đang vận hành theo lịch trình.',
-              4000
-            );
-          }, 3000);
+    //     if (Array.isArray(data)) {
+    //       data.forEach((n) => {
+    //         // hiển thị thông báo tùy loại
+    //         if (n.type === "warning") {
+    //           showWarning(n.title, n.message, n.duration || 4000);
+    //         } else {
+    //           showInfo(n.title, n.message, n.duration || 4000);
+    //         }
+    //       });
+    //     }
+    //   } catch (error) {
+    //     console.error("Lỗi khi tải thông báo:", error);
+    //     system.error && system.error("Không thể tải thông báo mới.");
+    //   }
+    // };
 
-          setTimeout(() => {
-            system.maintenanceReminder('29A-12345', '25/12/2024');
-          }, 6000);
-          
-          setTimeout(() => {
-            showWarning(
-              'Cảnh báo thời tiết',
-              'Dự báo có mưa to vào chiều nay. Khuyến cáo lái xe cẩn thận.',
-              8000
-            );
-          }, 9000);
-          break;
-
-        case 'parent':
-          // Parent-specific notifications
-          setTimeout(() => {
-            showInfo(
-              'Con bạn đã lên xe',
-              'Nguyễn Minh An đã lên xe buýt lúc 07:15. Dự kiến đến trường lúc 07:45.',
-              6000
-            );
-          }, 3000);
-
-          setTimeout(() => {
-            showInfo(
-              'Cập nhật vị trí',
-              'Xe buýt hiện đang ở Đường Lê Văn Việt, dự kiến 10 phút nữa đến trường.',
-              5000
-            );
-          }, 7000);
-          break;
-      }
-    };
-
-    setupNotifications();
+    // fetchNotifications();
   }, [loginKey, userRole, system, showInfo, showWarning]);
 
-  return null; // This component doesn't render anything
+  return null; // Không hiển thị giao diện, chỉ xử lý logic
 }

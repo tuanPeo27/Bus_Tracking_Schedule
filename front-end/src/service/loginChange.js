@@ -5,6 +5,7 @@ const userLogin = async (data) => {
 }
 
 const userChangePassword = async (data) => {
-    return instance.post(`user/changepassword`, data)
+    console.log(data);
+    return instance.post(`user/forgotpass`, data)
 }
 export { userLogin, userChangePassword };

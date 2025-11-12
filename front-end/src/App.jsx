@@ -32,6 +32,7 @@ export default function App() {
     setLoginKey("");
     Cookies.remove("access_token");
     Cookies.remove("user_role");
+    Cookies.remove("user_id");
     window.location.reload();
   };
 
