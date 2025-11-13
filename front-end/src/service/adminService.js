@@ -41,6 +41,17 @@ const getAllSchedule = async () => {
     return instance.get(`schedules`);
 }
 
+const updateSchedule = async (data, idSchedule) => {
+    return instance.put(`schedules/edit/${idSchedule}`, data)
+}
+
+const createSchedule = async (data) => {
+    return instance.post(`schedules/create`, data);
+}
+
+const deleteSchedule = async (idSchedule) => {
+    return instance.delete(`schedules/delete/${idSchedule}`);
+}
 
 
-export { getInfoAdmin, getAllDriver, getAllBus, getAllRoute, getAllStudent, getAllSchedule, getInfoRoute, getInfoBus, getInfoStudentByRouteId, getInfoDriver };
+export { getInfoAdmin, getAllDriver, getAllBus, getAllRoute, getAllStudent, getAllSchedule, getInfoRoute, getInfoBus, getInfoStudentByRouteId, getInfoDriver, createSchedule, updateSchedule, deleteSchedule };

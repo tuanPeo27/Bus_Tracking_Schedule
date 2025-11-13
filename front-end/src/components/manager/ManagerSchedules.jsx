@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import Cookies from "js-cookie";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
@@ -43,8 +44,10 @@ import {
   Bus,
   User,
 } from "lucide-react";
+import { createSchedule, deleteSchedule, getAllSchedule, getInfoBus, getInfoDriver, getInfoRoute, getInfoStudentByRouteId, updateSchedule } from "../../service/adminService";
 
 export default function ManagerSchedules() {
+  const { system, showError } = useNotificationHelpers();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -52,28 +55,104 @@ export default function ManagerSchedules() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { showSuccess, showInfo } = useNotificationHelpers();
   const [selectedSchedule, setSelectedSchedule] = useState(null);
+  const [allSchedule, setAllSchedule] = useState([]);
 
+  const refershAllSchedules = async () => {
+    try {
+      const res = await getAllSchedule();
+      setSchedulesState(res.data);
+    } catch (error) {
+      console.error("Lấy lịch trình thất bại:", error);
+      setAllSchedule([]);
+    }
+  };
+
+  const setSchedulesState = (res) => {
+    if (!res?.data) return setAllSchedule([]);
+
+    if (Array.isArray(res.data)) return setAllSchedule(res.data);
+
+    if (Array.isArray(res.data?.DT)) return setAllSchedule(res.data.DT);
+
+    setAllSchedule([]);
+  };
+
+
+  const getAllSchedules = async () => {
+    try {
+      const res = await getAllSchedule();
+      const dataSchedule = Array.isArray(res.data) ? res.data : res.data?.DT || [];
+
+      if (res?.data?.EC === 0) {
+        const infoSchedule = await Promise.all(
+          dataSchedule.map(async (item) => {
+            const routeInfo = await getInfoRoute(item.route_id);
+            const driverInfo = await getInfoDriver(item.driver_id);
+            const busInfo = await getInfoBus(item.bus_id);
+            const studentInfo = await getInfoStudentByRouteId(item.route_id);
+            return { ...item, routeInfo, driverInfo, busInfo, studentInfo };
+          })
+        );
+        setAllSchedule(infoSchedule);
+      } else {
+        setAllSchedule([]);
+      }
+
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách lịch trình:", error);
+      setAllSchedule([]);
+    }
+  };
+
+
+  const listRoute = Array.from(
+    new Map(
+      (allSchedule || []).map((s) => [s?.routeInfo?.data?.DT?.id, s?.routeInfo?.data?.DT])
+    ).values()
+  );
+
+  const listDriver = Array.from(
+    new Map(
+      (allSchedule || []).map((s) => [s?.driverInfo?.data?.DT?.id, s?.driverInfo?.data?.DT])
+    ).values()
+  );
+
+  const listBus = Array.from(
+    new Map(
+      (allSchedule || []).map((s) => [s?.busInfo?.data?.DT?.id, s?.busInfo?.data?.DT])
+    ).values()
+  );
+
+
+  useEffect(() => {
+    getAllSchedules();
+
+
+  }, []);
   const [newSchedule, setNewSchedule] = useState({
+    id: "",
+    bus_id: "",
+    driver_id: "",
+    route_id: "",
+    start_time: "",
+    end_time: "",
     date: "",
-    startTime: "",
-    endTime: "",
-    routeId: "",
-    driverId: "",
-    vehicleId: "",
+    status: "",
+
   });
 
   const [editSchedule, setEditSchedule] = useState({
     id: "",
+    bus_id: "",
+    driver_id: "",
+    route_id: "",
+    start_time: "",
+    end_time: "",
     date: "",
-    startTime: "",
-    endTime: "",
-    routeId: "",
-    driverId: "",
-    vehicleId: "",
     status: "",
   });
 
-  const { system } = useNotificationHelpers();
+
 
   const schedules = [
     {
@@ -158,52 +237,79 @@ export default function ManagerSchedules() {
     }
   };
 
-  const filteredSchedules = schedules.filter((schedule) => {
+  const filteredSchedules = allSchedule.filter((schedule) => {
     const matchesSearch =
-      schedule.route.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      schedule.driver.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      schedule.vehicle.includes(searchTerm.toLowerCase());
+      (schedule.routeInfo?.data?.DT?.name.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (schedule.routeInfo?.data?.DT?.start_point.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (schedule.routeInfo?.data?.DT?.end_point.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (schedule.driverInfo?.data?.DT?.username.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (schedule.busInfo?.data?.DT?.brand.includes(searchTerm.toLowerCase()) ?? false) ||
+      (schedule.busInfo?.data?.DT?.model.includes(searchTerm.toLowerCase()) ?? false);
 
-    const matchesStatus =
-      filterStatus === "all" || schedule.status === filterStatus;
-
-    return matchesSearch && matchesStatus;
+    return matchesSearch;
   });
 
-  const handleCreateSchedule = () => {
-    console.log("Creating schedule:", newSchedule);
-    system.dataCreated("Lịch trình mới");
-    setIsCreateDialogOpen(false);
-    setNewSchedule({
-      date: "",
-      startTime: "",
-      endTime: "",
-      routeId: "",
-      driverId: "",
-      vehicleId: "",
-    });
+  const handleCreateSchedule = async () => {
+    if (
+      !newSchedule.bus_id ||
+      !newSchedule.driver_id ||
+      !newSchedule.route_id ||
+      !newSchedule.end_time ||
+      !newSchedule.start_time ||
+      !newSchedule.date
+    ) {
+      showError("Vui lòng nhập đầy đủ thông tin");
+      return;
+    }
+    try {
+      await createSchedule(newSchedule);
+      console.log("Creating schedule:", newSchedule);
+      system.dataCreated("Lịch trình mới");
+      setIsCreateDialogOpen(false);
+      setNewSchedule({
+        date: "",
+        start_time: "",
+        end_time: "",
+        route_id: "",
+        bus_id: "",
+        driver_id: "",
+      });
+    } catch (error) {
+      console.error("Lỗi khi tạo lịch trình:", error);
+      showError("Không thể tạo lịch trình. Vui lòng thử lại!");
+    }
+
+    await getAllSchedules();
+
   };
 
-  const handleEditSchedule = (schedule) => {
-    setSelectedSchedule(schedule);
+  const handleEditSchedule = (newSchedule) => {
+    setSelectedSchedule(newSchedule);
     setEditSchedule({
-      id: schedule.id,
-      date: schedule.date,
-      startTime: schedule.startTime,
-      endTime: schedule.endTime,
-      routeId: schedule.route,
-      driverId: schedule.driver,
-      vehicleId: schedule.vehicle,
-      status: schedule.status,
+      id: newSchedule.id,
+      date: newSchedule.date,
+      start_time: newSchedule.start_time,
+      end_time: newSchedule.end_time,
+      route_id: newSchedule.route_id,
+      driver_id: newSchedule.driver_id,
+      bus_id: newSchedule.bus_id,
+      status: newSchedule.status,
     });
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateSchedule = () => {
-    console.log("Updating schedule:", editSchedule);
-    system.dataUpdated(`Lịch trình ${editSchedule.id}`);
-    setIsEditDialogOpen(false);
-    setSelectedSchedule(null);
+  const handleUpdateSchedule = async () => {
+    try {
+      await updateSchedule(editSchedule, editSchedule.id);
+      console.log("Updating schedule:", editSchedule);
+      system.dataUpdated(`Lịch trình ${editSchedule.id}`);
+      setIsEditDialogOpen(false);
+      setSelectedSchedule(null);
+    } catch (error) {
+      console.error("Lỗi khi chỉnh sửa lịch trình:", error);
+      showError("Không thể chỉnh sửa lịch trình. Vui lòng thử lại!");
+    }
+    await getAllSchedules();
   };
 
   const handleDeleteSchedule = (schedule) => {
@@ -211,11 +317,18 @@ export default function ManagerSchedules() {
     setIsDeleteDialogOpen(true);
   };
 
-  const confirmDeleteSchedule = () => {
-    console.log("Deleting schedule:", selectedSchedule);
-    system.dataDeleted(`Lịch trình ${selectedSchedule.id}`);
-    setIsDeleteDialogOpen(false);
-    setSelectedSchedule(null);
+  const confirmDeleteSchedule = async () => {
+    try {
+      await deleteSchedule(selectedSchedule.id);
+      console.log("Deleting schedule:", selectedSchedule);
+      system.dataDeleted(`Lịch trình ${selectedSchedule.id}`);
+      setIsDeleteDialogOpen(false);
+      setSelectedSchedule(null);
+    } catch (error) {
+      console.error("Lỗi khi chỉnh sửa lịch trình:", error);
+      showError("Không thể chỉnh sửa lịch trình. Vui lòng thử lại!");
+    }
+    await getAllSchedules();
   };
 
   return (
@@ -265,11 +378,11 @@ export default function ManagerSchedules() {
                       <Label>Thời gian bắt đầu</Label>
                       <Input
                         type="time"
-                        value={newSchedule.startTime}
+                        value={newSchedule.start_time}
                         onChange={(e) =>
                           setNewSchedule({
                             ...newSchedule,
-                            startTime: e.target.value,
+                            start_time: e.target.value,
                           })
                         }
                       />
@@ -281,11 +394,11 @@ export default function ManagerSchedules() {
                       <Label>Thời gian kết thúc</Label>
                       <Input
                         type="time"
-                        value={newSchedule.endTime}
+                        value={newSchedule.end_time}
                         onChange={(e) =>
                           setNewSchedule({
                             ...newSchedule,
-                            endTime: e.target.value,
+                            end_time: e.target.value,
                           })
                         }
                       />
@@ -293,18 +406,18 @@ export default function ManagerSchedules() {
                     <div>
                       <Label>Tuyến đường</Label>
                       <Select
-                        value={newSchedule.routeId}
+                        value={newSchedule.route_id}
                         onValueChange={(value) =>
-                          setNewSchedule({ ...newSchedule, routeId: value })
+                          setNewSchedule({ ...newSchedule, route_id: value })
                         }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Chọn tuyến đường" />
                         </SelectTrigger>
                         <SelectContent>
-                          {routes.map((route) => (
+                          {listRoute.map((route) => (
                             <SelectItem key={route.id} value={route.id}>
-                              {route.name}
+                              {route.name}: {route.start_point} - {route.end_point}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -316,18 +429,18 @@ export default function ManagerSchedules() {
                     <div>
                       <Label>Tài xế</Label>
                       <Select
-                        value={newSchedule.driverId}
+                        value={newSchedule.driver_id}
                         onValueChange={(value) =>
-                          setNewSchedule({ ...newSchedule, driverId: value })
+                          setNewSchedule({ ...newSchedule, driver_id: value })
                         }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Chọn tài xế" />
                         </SelectTrigger>
                         <SelectContent>
-                          {drivers.map((driver) => (
+                          {listDriver.map((driver) => (
                             <SelectItem key={driver.id} value={driver.id}>
-                              {driver.name}
+                              {driver.username}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -336,18 +449,18 @@ export default function ManagerSchedules() {
                     <div>
                       <Label>Xe buýt</Label>
                       <Select
-                        value={newSchedule.vehicleId}
+                        value={newSchedule.bus_id}
                         onValueChange={(value) =>
-                          setNewSchedule({ ...newSchedule, vehicleId: value })
+                          setNewSchedule({ ...newSchedule, bus_id: value })
                         }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Chọn xe buýt" />
                         </SelectTrigger>
                         <SelectContent>
-                          {vehicles.map((vehicle) => (
-                            <SelectItem key={vehicle.id} value={vehicle.id}>
-                              {vehicle.plate} - {vehicle.brand}
+                          {listBus.map((bus) => (
+                            <SelectItem key={bus.id} value={bus.id}>
+                              {bus.brand} {bus.model}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -382,18 +495,7 @@ export default function ManagerSchedules() {
                 className="pl-10"
               />
             </div>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                <SelectItem value="active">Đang thực hiện</SelectItem>
-                <SelectItem value="scheduled">Đã lên lịch</SelectItem>
-                <SelectItem value="completed">Hoàn thành</SelectItem>
-                <SelectItem value="cancelled">Đã hủy</SelectItem>
-              </SelectContent>
-            </Select>
+
           </div>
         </CardContent>
       </Card>
@@ -415,7 +517,7 @@ export default function ManagerSchedules() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredSchedules.map((schedule) => (
+              {(filteredSchedules.length > 0 ? filteredSchedules : allSchedule).map((schedule) => (
                 <TableRow key={schedule.id}>
                   <TableCell>
                     <Badge variant="outline">{schedule.id}</Badge>
@@ -428,33 +530,35 @@ export default function ManagerSchedules() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="w-3 h-3" />
-                        {schedule.startTime} - {schedule.endTime}
+                        {schedule.start_time} - {schedule.end_time}
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="max-w-xs">
-                      <p className="truncate font-medium">{schedule.route}</p>
+                      <p className="truncate font-medium">
+                        {schedule.routeInfo?.data?.DT?.name}: {schedule.routeInfo?.data?.DT?.start_point} - {schedule.routeInfo?.data?.DT?.end_point}
+                      </p>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4" />
-                      {schedule.driver}
+                      {schedule.driverInfo?.data?.DT?.username}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Bus className="w-4 h-4" />
-                      {schedule.vehicle}
+                      {schedule.busInfo?.data?.DT?.brand}-{schedule.busInfo?.data?.DT?.model}
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary">
-                      {schedule.studentsCount} HS
+                      {schedule.studentInfo?.data?.DT["length"]} HS
                     </Badge>
                   </TableCell>
-                  <TableCell>{getStatusBadge(schedule.status)}</TableCell>
+                  <TableCell>{schedule.status}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Button
@@ -488,7 +592,7 @@ export default function ManagerSchedules() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              Chỉnh sửa lịch trình: {selectedSchedule?.id}
+              Chỉnh sửa lịch trình: {editSchedule.id}
             </DialogTitle>
             <DialogDescription>
               Cập nhật thông tin lịch trình và phân công tài xế, xe buýt.
@@ -519,10 +623,10 @@ export default function ManagerSchedules() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="scheduled">Đã lên lịch</SelectItem>
-                    <SelectItem value="active">Đang hoạt động</SelectItem>
-                    <SelectItem value="completed">Hoàn thành</SelectItem>
-                    <SelectItem value="cancelled">Đã hủy</SelectItem>
+                    <SelectItem value="scheduled">scheduled</SelectItem>
+                    <SelectItem value="active">active</SelectItem>
+                    <SelectItem value="completed">completed</SelectItem>
+                    <SelectItem value="cancelled">cancelled</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -534,11 +638,11 @@ export default function ManagerSchedules() {
                 <Input
                   id="edit-start-time"
                   type="time"
-                  value={editSchedule.startTime}
+                  value={editSchedule.start_time}
                   onChange={(e) =>
                     setEditSchedule({
                       ...editSchedule,
-                      startTime: e.target.value,
+                      start_time: e.target.value,
                     })
                   }
                 />
@@ -548,11 +652,11 @@ export default function ManagerSchedules() {
                 <Input
                   id="edit-end-time"
                   type="time"
-                  value={editSchedule.endTime}
+                  value={editSchedule.end_time}
                   onChange={(e) =>
                     setEditSchedule({
                       ...editSchedule,
-                      endTime: e.target.value,
+                      end_time: e.target.value,
                     })
                   }
                 />
@@ -562,18 +666,18 @@ export default function ManagerSchedules() {
             <div className="space-y-2">
               <Label htmlFor="edit-route">Tuyến đường</Label>
               <Select
-                value={editSchedule.routeId}
+                value={editSchedule.route_id}
                 onValueChange={(value) =>
-                  setEditSchedule({ ...editSchedule, routeId: value })
+                  setEditSchedule({ ...editSchedule, route_id: value })
                 }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Chọn tuyến đường" />
                 </SelectTrigger>
                 <SelectContent>
-                  {routes.map((route) => (
-                    <SelectItem key={route.id} value={route.name}>
-                      {route.name}
+                  {listRoute.map((route) => (
+                    <SelectItem key={route.id} value={route.id}>
+                      {route.name}: {route.start_point} - {route.end_point}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -584,18 +688,18 @@ export default function ManagerSchedules() {
               <div className="space-y-2">
                 <Label htmlFor="edit-driver">Tài xế</Label>
                 <Select
-                  value={editSchedule.driverId}
+                  value={editSchedule.driver_id}
                   onValueChange={(value) =>
-                    setEditSchedule({ ...editSchedule, driverId: value })
+                    setEditSchedule({ ...editSchedule, driver_id: value })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn tài xế" />
                   </SelectTrigger>
                   <SelectContent>
-                    {drivers.map((driver) => (
-                      <SelectItem key={driver.id} value={driver.name}>
-                        {driver.name}
+                    {listDriver.map((driver) => (
+                      <SelectItem key={driver.id} value={driver.id}>
+                        {driver.username}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -604,18 +708,18 @@ export default function ManagerSchedules() {
               <div className="space-y-2">
                 <Label htmlFor="edit-vehicle">Xe</Label>
                 <Select
-                  value={editSchedule.vehicleId}
+                  value={editSchedule.bus_id}
                   onValueChange={(value) =>
-                    setEditSchedule({ ...editSchedule, vehicleId: value })
+                    setEditSchedule({ ...editSchedule, bus_id: value })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn xe" />
                   </SelectTrigger>
                   <SelectContent>
-                    {vehicles.map((vehicle) => (
-                      <SelectItem key={vehicle.id} value={vehicle.plate}>
-                        {vehicle.plate} - {vehicle.brand}
+                    {listBus.map((bus) => (
+                      <SelectItem key={bus.id} value={bus.id}>
+                        {bus.brand} {bus.model}
                       </SelectItem>
                     ))}
                   </SelectContent>

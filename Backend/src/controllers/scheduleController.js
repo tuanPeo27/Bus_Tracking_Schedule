@@ -193,7 +193,7 @@ exports.editSchedule = async (req, res) => {
 exports.editScheduleById = async (req, res) => {
   try {
     const scheduleId = req.params.id;
-    const { date, time, route_id, bus_id, driver_id } = req.body;
+    const { date, time, route_id, bus_id, driver_id, status: scheduleStatus } = req.body;
     const schedule = await Schedule.findOne({
       where: { id: scheduleId },
     });
@@ -207,6 +207,7 @@ exports.editScheduleById = async (req, res) => {
     schedule.route_id = route_id || schedule.route_id;
     schedule.bus_id = bus_id || schedule.bus_id;
     schedule.driver_id = driver_id || schedule.driver_id;
+    schedule.status = scheduleStatus || schedule.status;
     await schedule.save();
     res.status(200).json({
       EC: 0,

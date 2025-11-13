@@ -29,7 +29,6 @@ export default function ManagerDashboard() {
   const getAllDrivers = async () => {
     try {
       const res = await getAllDriver();
-      console.log(res.data.DT["length"]);
       if (res && res.data.EC === 0) {
         setAllDriverInfo(res.data.DT);
       }
@@ -42,7 +41,6 @@ export default function ManagerDashboard() {
   const getAllBuses = async () => {
     try {
       const res = await getAllBus();
-      console.log(res.data.DT["length"]);
       if (res && res.data.EC === 0) {
         setAllBusInfo(res.data.DT);
       }
@@ -55,7 +53,6 @@ export default function ManagerDashboard() {
   const getAllRoutes = async () => {
     try {
       const res = await getAllRoute();
-      console.log(res.data.DT["length"]);
       if (res && res.data.EC === 0) {
         setAllRouteInfo(res.data.DT);
       }
@@ -68,7 +65,6 @@ export default function ManagerDashboard() {
   const getAllStudents = async () => {
     try {
       const res = await getAllStudent();
-      console.log(res.data.DT["length"]);
       if (res && res.data.EC === 0) {
         setAllStudentInfo(res.data.DT);
       }
@@ -81,9 +77,6 @@ export default function ManagerDashboard() {
   const getUpcomingSchedules = async () => {
     try {
       const res = await getAllSchedule();
-      console.log("API response:", res.data);
-      // const r = await getInfoRoute(res.data.DT.);
-      // console.log("check route", r);
       if (res && res.data.EC === 0 && Array.isArray(res.data.DT)) {
         const now = new Date();
 
