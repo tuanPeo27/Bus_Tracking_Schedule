@@ -13,8 +13,8 @@ router.get(
 );
 router.post(
   "/create",
-  verifyToken,
-  authorizeAdmin,
+  // verifyToken,
+  // authorizeAdmin,
   studentController.createStudent
 );
 router.put("/edit", verifyToken, authorizeAdmin, studentController.editStudent);

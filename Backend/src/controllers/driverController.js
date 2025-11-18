@@ -127,3 +127,22 @@ exports.editDriverById = async (req, res) => {
     res.status(500).json({ EC: -1, EM: "Lỗi server.", DT: null });
   }
 };
+
+exports.deleteDriver = async (req, res) => {
+  try {
+    const driverId = req.params.id;
+    const driver = await User.findOne({
+      where: { id: driverId, role: "driver" },
+    });
+    if (!driver) {
+      return res
+        .status(404)
+        .json({ EC: 1, EM: "Tài xế không tồn tại.", DT: null });
+    }
+    await driver.destroy();
+    res.status(200).json({ EC: 0, EM: "Xóa tài xế thành cong.", DT: null });
+  } catch (error) {
+    console.error("Lỗi xóa tài xế:", error);
+    res.status(500).json({ EC: -1, EM: "Lỗi server.", DT: null });
+  }
+};
