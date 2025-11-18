@@ -65,10 +65,8 @@ export function ManagerApp({ onBack }) {
     }
   };
 
-
   useEffect(() => {
     getAdmin();
-
   }, []);
 
   // const adminInfo = {
@@ -105,17 +103,16 @@ export function ManagerApp({ onBack }) {
 
               <Avatar className={isMobile ? "w-8 h-8" : ""}>
                 <AvatarFallback className="bg-blue-600 text-white">
-                  {adminInfo.username ? adminInfo.username.charAt(0).toUpperCase() : "A"}
+                  {adminInfo.username
+                    ? adminInfo.username.charAt(0).toUpperCase()
+                    : "A"}
                 </AvatarFallback>
-
               </Avatar>
 
               {!isMobile && (
                 <div className="text-right">
                   <p className="font-medium">{adminInfo.username}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Quản lý
-                  </p>
+                  <p className="text-sm text-muted-foreground">Quản lý</p>
                 </div>
               )}
 
@@ -138,80 +135,91 @@ export function ManagerApp({ onBack }) {
         <div className={isMobile ? "px-2" : "px-4"}>
           <AnimatedTabs value={activeTab} onValueChange={setActiveTab}>
             <AnimatedTabsList
-              className={`${isMobile ? "h-16 w-full justify-start" : "h-12"
-                } bg-transparent border-0 ${isMobile
+              className={`${
+                isMobile ? "h-16 w-full justify-start" : "h-12"
+              } bg-transparent border-0 ${
+                isMobile
                   ? "overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
                   : ""
-                }`}
+              }`}
             >
               <AnimatedTabsTrigger
                 value="dashboard"
-                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                  }`}
+                className={`${
+                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                }`}
               >
                 <LayoutDashboard className="w-4 h-4" />
                 {isMobile ? "Tổng" : "Tổng quan"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="schedules"
-                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                  }`}
+                className={`${
+                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                }`}
               >
                 <Calendar className="w-4 h-4" />
                 {isMobile ? "Lịch" : "Lịch trình"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="students"
-                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                  }`}
+                className={`${
+                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                }`}
               >
                 <GraduationCap className="w-4 h-4" />
                 {isMobile ? "H.sinh" : "Học sinh"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="drivers"
-                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                  }`}
+                className={`${
+                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                }`}
               >
                 <UserCheck className="w-4 h-4" />
                 {isMobile ? "T.xế" : "Tài xế"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="vehicles"
-                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                  }`}
+                className={`${
+                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                }`}
               >
                 <Bus className="w-4 h-4" />
                 {isMobile ? "Xe" : "Xe buýt"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="routes"
-                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                  }`}
+                className={`${
+                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                }`}
               >
                 <Route className="w-4 h-4" />
                 {isMobile ? "Tuyến" : "Tuyến đường"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="tracking"
-                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                  }`}
+                className={`${
+                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                }`}
               >
                 <MapPin className="w-4 h-4" />
                 {isMobile ? "GPS" : "Theo dõi GPS"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="messages"
-                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                  }`}
+                className={`${
+                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                }`}
               >
                 <MessageSquare className="w-4 h-4" />
                 {isMobile ? "T.nhắn" : "Tin nhắn"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="password"
-                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                  }`}
+                className={`${
+                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                }`}
               >
                 <KeyRound className="w-4 h-4" />
                 {isMobile ? "Đổi MK" : "Đổi mật khẩu"}
@@ -258,7 +266,7 @@ export function ManagerApp({ onBack }) {
             </AnimatedTabsContent>
 
             <AnimatedTabsContent value="password" className="mt-0">
-              <ChangePassword username="quanly01" userRole="admin" />
+              <ChangePassword userRole={Cookies.get("user_role")} />
             </AnimatedTabsContent>
           </AnimatedTabs>
         </div>

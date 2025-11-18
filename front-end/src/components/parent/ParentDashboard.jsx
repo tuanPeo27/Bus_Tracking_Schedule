@@ -2,7 +2,7 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Avatar, AvatarFallback } from "../ui/avatar";
-import { User, School, Phone, Bell, Bus } from "lucide-react";
+import { User, School, Bus } from "lucide-react";
 
 export function ParentDashboard({ parentInfo, studentInfo, routeInfo }) {
   const parent = parentInfo;
@@ -18,7 +18,6 @@ export function ParentDashboard({ parentInfo, studentInfo, routeInfo }) {
   const routes = React.useMemo(() => {
     return Array.isArray(routeInfo) ? routeInfo : routeInfo ? [routeInfo] : [];
   }, [routeInfo]);
-  console.log(routes[0]);
   return (
     <div className="space-y-6">
       {/* Thông tin phụ huynh & con em */}

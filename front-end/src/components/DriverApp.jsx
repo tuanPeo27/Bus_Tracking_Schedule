@@ -263,7 +263,7 @@ export function DriverApp({ onBack }) {
           </AnimatedTabsContent>
 
           <AnimatedTabsContent value="password" className="mt-0">
-            <ChangePassword username="taixe01" userRole="driver" />
+            <ChangePassword userRole={Cookies.get("user_role")} />
           </AnimatedTabsContent>
         </AnimatedTabs>
       </main>

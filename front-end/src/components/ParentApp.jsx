@@ -235,7 +235,7 @@ export function ParentApp({ onBack }) {
           </TabsContent>
 
           <TabsContent value="tracking" className="mt-0">
-            <ParentTracking children={parentInfo.children} />
+            <ParentTracking studentInfo={studentInfo} routeInfo={routeInfo} />
           </TabsContent>
 
           <TabsContent value="notifications" className="mt-0">
@@ -247,7 +247,7 @@ export function ParentApp({ onBack }) {
           </TabsContent> */}
 
           <TabsContent value="password" className="mt-0">
-            <ChangePassword username="phuhuynh01" userRole="parent" />
+            <ChangePassword userRole={Cookies.get("user_role")} />
           </TabsContent>
         </Tabs>
       </main>

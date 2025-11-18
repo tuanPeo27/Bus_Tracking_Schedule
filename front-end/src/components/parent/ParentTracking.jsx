@@ -16,7 +16,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 
-export function ParentTracking({ children }) {
+export function ParentTracking({ studentInfo, routeInfo }) {
   const [busLocation, setBusLocation] = useState({
     lat: 10.8231,
     lng: 106.6297,
