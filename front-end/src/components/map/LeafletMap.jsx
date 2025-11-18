@@ -52,9 +52,19 @@ export function LeafletMap({ height, center, zoom = 13, markers = [], className,
     markerGroupRef.current.clearLayers();
     (markers || []).forEach((marker) => {
       if (!marker || !marker.position) return;
-      const m = L.marker([marker.position.lat, marker.position.lng]);
-      if (marker.title) m.bindPopup(marker.title);
-      m.addTo(markerGroupRef.current);
+
+  let leafletMarker = L.marker([marker.position.lat, marker.position.lng], {
+    draggable: marker.draggable || false, // <-- thêm draggable
+  }).addTo(markerGroupRef.current)
+    .bindPopup(marker.title || "");
+
+  // Nếu có callback onDrag, dùng event
+  if (marker.draggable && marker.onDrag) {
+    leafletMarker.on("dragend", (e) => {
+      const pos = e.target.getLatLng();
+      marker.onDrag({ lat: pos.lat, lng: pos.lng });
+    });
+  }
     });
 
     // --- Cập nhật polylines ---

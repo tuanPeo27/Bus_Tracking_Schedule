@@ -6,6 +6,7 @@ import { LeafletMap } from "../map/LeafletMap";
 import { useNotificationHelpers } from "../useNotificationHelpers";
 import { io } from "socket.io-client";
 import { getBusStopsByRouteId } from "../../service/driverService";
+import { map } from "leaflet";
 
 const GEOAPIFY_KEY = "2b833a5c3c1649d89c2e52d7976c7534";
 
@@ -63,10 +64,16 @@ export default function DriverGPS({ route_id, vehicle_id }) {
       }
     });
 
+    //TODO: Tao sua ne
+    setCurrentLocation({lat: 10.8231, lng: 106.6297})
+
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        setCurrentLocation({ lat: latitude, lng: longitude });
+
+        //TODO: Tao sua ne
+        // setCurrentLocation({ lat: latitude, lng: longitude });
+
         socket.emit("bus_location_update", { bus_id: vehicle_id, latitude, longitude });
       },
       (error) => {
@@ -85,21 +92,38 @@ export default function DriverGPS({ route_id, vehicle_id }) {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const fetchSegment = async (a, b) => {
-    const url = `https://api.geoapify.com/v1/routing?waypoints=${a.lat},${a.lng}|${b.lat},${b.lng}&mode=drive&apiKey=${GEOAPIFY_KEY}`;
-    try {
-      const res = await fetch(url);
-      if (!res.ok){
-        return [];
-      }
-      const json = await res.json();
-      const coords = json?.features?.[0]?.geometry?.coordinates || [];
-      console.log("Segment fetched:", coords);
-      return coords.map((c) => ({ lat: c[1], lng: c[0] }));
-    } catch (err) {
-      console.warn("Routing fail:", err);
-      return [];
+  const url = `https://api.geoapify.com/v1/routing?waypoints=${a.lat},${a.lng}|${b.lat},${b.lng}&mode=bus&apiKey=${GEOAPIFY_KEY}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return [];
+
+    const json = await res.json();
+    console.log("json", json);
+    const geometry = json?.features?.[0]?.geometry;
+
+    if (!geometry || !geometry.coordinates) return [];
+
+    let coords = [];
+
+    if (geometry.type === "LineString") {
+      coords = geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
+    } else if (geometry.type === "MultiLineString") {
+      // Flatten tất cả các line thành 1 mảng duy nhất
+      coords = geometry.coordinates.flatMap(line =>
+        line.map(([lng, lat]) => ({ lat, lng }))
+      );
     }
-  };
+
+    // Loại bỏ điểm null/undefined
+    coords = coords.filter(Boolean);
+
+    console.log("Segment fetched:", coords.length);
+    return coords;
+  } catch (err) {
+    console.warn("Routing fail:", err);
+    return [];
+  }
+};
 
   // --- Logic Routing Mới ---
 
@@ -126,9 +150,7 @@ export default function DriverGPS({ route_id, vehicle_id }) {
           // Nối mảng, tránh trùng điểm nối
           if (allCoords.length > 0) {
             allCoords = [...allCoords, ...seg.slice(1)];
-            console.log("BayGa");
             } else {
-              console.log("XamLon");
                  allCoords = [...seg];
             }
         } else {
@@ -189,8 +211,8 @@ export default function DriverGPS({ route_id, vehicle_id }) {
         id: "route-driver-start",
         positions: driverToFirstStopCoords,
         color: "#3b82f6", // Blue
-        weight: 4,
-        opacity: 0.8,
+        weight: 6,
+        opacity: 1,
         dashArray: "10, 10", // Tạo hiệu ứng nét đứt để phân biệt
       });
     }
@@ -201,8 +223,8 @@ export default function DriverGPS({ route_id, vehicle_id }) {
         id: "route-static-busline",
         positions: staticRouteCoords,
         color: "#28a745", // Green
-        weight: 6,
-        opacity: 1,
+        weight: 4,
+        opacity: 0.5,
       });
     }
 
@@ -210,28 +232,30 @@ export default function DriverGPS({ route_id, vehicle_id }) {
   }, [driverToFirstStopCoords, staticRouteCoords]);
 
   const mapMarkers = useMemo(() => {
-    const fallback = { lat: 10.8231, lng: 106.6297 };
-    return [
-      {
-        id: "current-vehicle",
-        position: currentLocation || fallback,
-        title: `Xe của bạn`,
-        type: "bus-current", // Bạn có thể custom icon trong LeafletMap dựa trên type này
-      },
-      ...busStops.map((stop, index) => ({
-        id: `stop-${stop.id || index}`,
-        position: { lat: stop.latitude, lng: stop.longitude },
-        title: `${index + 1}. ${stop.name}`, // Đánh số thứ tự trạm
-        type: "stop",
-      })),
-      ...Object.entries(otherBuses).map(([busId, pos]) => ({
-        id: `bus-${busId}`,
-        position: pos,
-        title: `Xe ${busId}`,
-        type: "bus",
-      })),
-    ];
-  }, [currentLocation, busStops, otherBuses]);
+  const fallback = { lat: 10.8231, lng: 106.6297 };
+  return [
+    {
+      id: "current-vehicle",
+      position: currentLocation || fallback,
+      title: `Xe của bạn`,
+      type: "bus-current",
+      draggable: true,                  // <-- bật draggable
+      onDrag: (pos) => setCurrentLocation(pos), // <-- cập nhật vị trí khi kéo
+    },
+    ...busStops.map((stop, index) => ({
+      id: `stop-${stop.id || index}`,
+      position: { lat: stop.latitude, lng: stop.longitude },
+      title: `${index + 1}. ${stop.name}`,
+      type: "stop",
+    })),
+    ...Object.entries(otherBuses).map(([busId, pos]) => ({
+      id: `bus-${busId}`,
+      position: pos,
+      title: `Xe ${busId}`,
+      type: "bus",
+    })),
+  ];
+}, [currentLocation, busStops, otherBuses]);
 
   return (
     <div className="space-y-6">
