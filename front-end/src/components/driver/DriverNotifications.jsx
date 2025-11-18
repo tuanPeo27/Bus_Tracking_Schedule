@@ -29,7 +29,7 @@ export default function DriverNotifications({ driverId }) {
       content:
         "Lịch trình ngày mai (20/12) đã được thay đổi. Thời gian bắt đầu từ 06:30 thay vì 07:00. Vui lòng xác nhận đã nhận được thông báo.",
       sender: "Phòng Điều Hành",
-      senderType: "manager",
+      senderType: "admin",
       timestamp: new Date(Date.now() - 30 * 60 * 1000),
       isRead: false,
       requiresAction: true,
@@ -53,7 +53,7 @@ export default function DriverNotifications({ driverId }) {
       content:
         "Xe 29A-12345 đã đến hạn bảo dưỡng định kỳ. Vui lòng đưa xe đến garage vào cuối tuần này.",
       sender: "Phòng Kỹ Thuật",
-      senderType: "manager",
+      senderType: "admin",
       timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
       isRead: true,
       requiresAction: false,
@@ -142,11 +142,11 @@ export default function DriverNotifications({ driverId }) {
       .join("")
       .slice(0, 2);
     const bgColor =
-      senderType === "manager"
+      senderType === "admin"
         ? "bg-blue-500"
         : senderType === "parent"
-        ? "bg-green-500"
-        : "bg-gray-500";
+          ? "bg-green-500"
+          : "bg-gray-500";
 
     return (
       <Avatar className="w-8 h-8">
@@ -255,11 +255,10 @@ export default function DriverNotifications({ driverId }) {
         {filteredNotifications.map((notification) => (
           <Card
             key={notification.id}
-            className={`${
-              !notification.isRead
-                ? "border-l-4 border-blue-500 bg-blue-50/50"
-                : ""
-            }`}
+            className={`${!notification.isRead
+              ? "border-l-4 border-blue-500 bg-blue-50/50"
+              : ""
+              }`}
           >
             <CardContent className="p-4">
               <div className="flex items-start gap-4">
@@ -297,11 +296,11 @@ export default function DriverNotifications({ driverId }) {
                       <div className="text-sm leading-tight">
                         <p className="font-medium">{notification.sender}</p>
                         <p className="text-muted-foreground text-xs">
-                          {notification.senderType === "manager"
+                          {notification.senderType === "admin"
                             ? "Quản lý"
                             : notification.senderType === "parent"
-                            ? "Phụ huynh"
-                            : "Hệ thống"}
+                              ? "Phụ huynh"
+                              : "Hệ thống"}
                         </p>
                       </div>
                     </div>

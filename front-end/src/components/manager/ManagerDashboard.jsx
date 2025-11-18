@@ -1,4 +1,6 @@
 import React from "react";
+import { useState, useEffect } from "react";
+import Cookies from "js-cookie";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Progress } from "../ui/progress";
@@ -15,18 +17,114 @@ import {
   Calendar,
   MapPin,
 } from "lucide-react";
+import { getAllBus, getAllDriver, getAllRoute, getAllSchedule, getAllStudent, getInfoBus, getInfoRoute, getInfoStudentByRouteId, getInfoDriver } from "../../service/adminService";
 
 export default function ManagerDashboard() {
-  const stats = {
-    totalDrivers: 45,
-    activeDrivers: 38,
-    totalVehicles: 25,
-    activeVehicles: 22,
-    totalRoutes: 12,
-    totalStudents: 1250,
-    onTimeRate: 94.5,
-    completedTrips: 186,
+  const [allDriverInfo, setAllDriverInfo] = useState("");
+  const [allBusInfo, setAllBusInfo] = useState("");
+  const [allRouteInfo, setAllRouteInfo] = useState("");
+  const [allStudentInfo, setAllStudentInfo] = useState("");
+  const [upcomingSchedules, setUpcomingSchedules] = useState([]);
+
+  const getAllDrivers = async () => {
+    try {
+      const res = await getAllDriver();
+      if (res && res.data.EC === 0) {
+        setAllDriverInfo(res.data.DT);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách tài xế:", error);
+      res.status(500).json({ message: "Lỗi server" });
+    }
   };
+
+  const getAllBuses = async () => {
+    try {
+      const res = await getAllBus();
+      if (res && res.data.EC === 0) {
+        setAllBusInfo(res.data.DT);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách xe bus:", error);
+      res.status(500).json({ message: "Lỗi server" });
+    }
+  }
+
+  const getAllRoutes = async () => {
+    try {
+      const res = await getAllRoute();
+      if (res && res.data.EC === 0) {
+        setAllRouteInfo(res.data.DT);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách tuyến đường:", error);
+      res.status(500).json({ message: "Lỗi server" });
+    }
+  }
+
+  const getAllStudents = async () => {
+    try {
+      const res = await getAllStudent();
+      if (res && res.data.EC === 0) {
+        setAllStudentInfo(res.data.DT);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách học sinh:", error);
+      res.status(500).json({ message: "Lỗi server" });
+    }
+  }
+
+  const getUpcomingSchedules = async () => {
+    try {
+      const res = await getAllSchedule();
+      if (res && res.data.EC === 0 && Array.isArray(res.data.DT)) {
+        const now = new Date();
+
+        const top3 = res.data.DT
+          .map(item => {
+            const [hour, minute, second] = item.start_time.split(":").map(Number);
+            const [year, month, day] = item.date.split("-").map(Number);
+            // Chuyển thành Date
+            const scheduleDateTime = new Date(year, month - 1, day, hour, minute, second);
+            return { ...item, scheduleDateTime };
+          })
+          // Chỉ giữ các lịch sắp tới
+          .filter(item => item.scheduleDateTime > now)
+          // Sắp xếp gần nhất lên đầu
+          .sort((a, b) => a.scheduleDateTime - b.scheduleDateTime)
+          // Lấy tối đa 3 cái
+          .slice(0, 3);
+
+        const top3Upcoming = await Promise.all(
+          top3.map(async item => {
+            const routeInfo = await getInfoRoute(item.route_id); // giả sử API trả về object
+            const busInfo = await getInfoBus(item.bus_id);
+            const studentInfo = await getInfoStudentByRouteId(routeInfo.data.DT.id);
+            const driverInfo = await getInfoDriver(item.driver_id);
+            return { ...item, routeInfo, busInfo, studentInfo, driverInfo };
+          })
+        );
+
+        console.log("Top 3 upcoming schedules:", top3Upcoming);
+        setUpcomingSchedules(top3Upcoming);
+        return top3Upcoming;
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách lịch trình:", error);
+    }
+  };
+
+
+
+  useEffect(() => {
+    getAllDrivers();
+    getAllBuses();
+    getAllRoutes();
+    getAllStudents();
+    getUpcomingSchedules();
+
+  }, []);
+
 
   const recentAlerts = [
     {
@@ -52,45 +150,31 @@ export default function ManagerDashboard() {
     },
   ];
 
-  const vehicleStatus = [
-    {
-      status: "Đang hoạt động",
-      count: 22,
-      color: "bg-green-500",
-      percentage: 88,
-    },
-    {
-      status: "Nghỉ giải lao",
-      count: 2,
-      color: "bg-yellow-500",
-      percentage: 8,
-    },
-    { status: "Bảo trì", count: 1, color: "bg-blue-500", percentage: 4 },
-  ];
 
-  const upcomingSchedules = [
-    {
-      time: "14:30",
-      route: "Tuyến 1",
-      driver: "Nguyễn Văn Minh",
-      vehicle: "29A-12345",
-      students: 42,
-    },
-    {
-      time: "15:00",
-      route: "Tuyến 2",
-      driver: "Trần Văn Hùng",
-      vehicle: "29A-67890",
-      students: 38,
-    },
-    {
-      time: "15:30",
-      route: "Tuyến 3",
-      driver: "Lê Thị Lan",
-      vehicle: "29A-11111",
-      students: 45,
-    },
-  ];
+
+  // const upcomingSchedules = [
+  //   {
+  //     time: "14:30",
+  //     route: "Tuyến 1",
+  //     driver: "Nguyễn Văn Minh",
+  //     vehicle: "29A-12345",
+  //     students: 42,
+  //   },
+  //   {
+  //     time: "15:00",
+  //     route: "Tuyến 2",
+  //     driver: "Trần Văn Hùng",
+  //     vehicle: "29A-67890",
+  //     students: 38,
+  //   },
+  //   {
+  //     time: "15:30",
+  //     route: "Tuyến 3",
+  //     driver: "Lê Thị Lan",
+  //     vehicle: "29A-11111",
+  //     students: 45,
+  //   },
+  // ];
 
   const getAlertIcon = (type) => {
     switch (type) {
@@ -116,9 +200,8 @@ export default function ManagerDashboard() {
               <div>
                 <p className="text-sm text-muted-foreground">Tài xế</p>
                 <p className="font-semibold">
-                  {stats.activeDrivers}/{stats.totalDrivers}
+                  {allDriverInfo["length"]}
                 </p>
-                <p className="text-xs text-green-600">Đang hoạt động</p>
               </div>
             </div>
           </CardContent>
@@ -133,9 +216,8 @@ export default function ManagerDashboard() {
               <div>
                 <p className="text-sm text-muted-foreground">Xe buýt</p>
                 <p className="font-semibold">
-                  {stats.activeVehicles}/{stats.totalVehicles}
+                  {allBusInfo["length"]}
                 </p>
-                <p className="text-xs text-green-600">Sẵn sàng</p>
               </div>
             </div>
           </CardContent>
@@ -149,8 +231,7 @@ export default function ManagerDashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Tuyến đường</p>
-                <p className="font-semibold">{stats.totalRoutes}</p>
-                <p className="text-xs text-purple-600">Đang vận hành</p>
+                <p className="font-semibold">{allRouteInfo["length"]}</p>
               </div>
             </div>
           </CardContent>
@@ -165,9 +246,8 @@ export default function ManagerDashboard() {
               <div>
                 <p className="text-sm text-muted-foreground">Học sinh</p>
                 <p className="font-semibold">
-                  {stats.totalStudents.toLocaleString()}
+                  {allStudentInfo["length"]}
                 </p>
-                <p className="text-xs text-orange-600">Đã đăng ký</p>
               </div>
             </div>
           </CardContent>
@@ -177,61 +257,6 @@ export default function ManagerDashboard() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Performance Overview */}
         <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5" />
-                Hiệu suất hoạt động hôm nay
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm">Tỷ lệ đúng giờ</span>
-                    <span className="font-medium">{stats.onTimeRate}%</span>
-                  </div>
-                  <Progress value={stats.onTimeRate} className="h-2" />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm">Chuyến hoàn thành</span>
-                    <span className="font-medium">
-                      {stats.completedTrips}/200
-                    </span>
-                  </div>
-                  <Progress
-                    value={(stats.completedTrips / 200) * 100}
-                    className="h-2"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-medium">Trạng thái xe buýt</h4>
-                {vehicleStatus.map((status, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${status.color}`} />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm">{status.status}</span>
-                        <span className="text-sm font-medium">
-                          {status.count} xe
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full ${status.color}`}
-                          style={{ width: `${status.percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Upcoming Schedules */}
           <Card>
@@ -250,25 +275,26 @@ export default function ManagerDashboard() {
                   >
                     <div className="flex items-center gap-2 min-w-[80px]">
                       <Clock className="w-4 h-4 text-blue-600" />
-                      <span className="font-medium">{schedule.time}</span>
+                      <span className="font-medium">{schedule.start_time}</span>
                     </div>
 
                     <div className="flex-1 grid grid-cols-3 gap-4">
                       <div>
                         <p className="text-sm text-muted-foreground">Tuyến</p>
-                        <p className="font-medium">{schedule.route}</p>
+                        <p className="font-medium">
+                          {schedule.routeInfo?.data?.DT?.name} : {schedule.routeInfo?.data?.DT?.start_point}-{schedule.routeInfo?.data?.DT?.end_point}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Tài xế</p>
-                        <p className="font-medium">{schedule.driver}</p>
+                        <p className="font-medium">{schedule.driverInfo?.data?.DT?.username}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Xe</p>
-                        <p className="font-medium">{schedule.vehicle}</p>
+                        <p className="font-medium">{schedule.busInfo?.data?.DT?.brand}-{schedule.busInfo?.data?.DT?.model}</p>
                       </div>
                     </div>
 
-                    <Badge variant="outline">{schedule.students} HS</Badge>
+                    <Badge variant="outline">{schedule.studentInfo?.data?.DT["length"]} HS</Badge>
                   </div>
                 ))}
               </div>
@@ -304,16 +330,16 @@ export default function ManagerDashboard() {
                         alert.severity === "high"
                           ? "destructive"
                           : alert.severity === "medium"
-                          ? "default"
-                          : "secondary"
+                            ? "default"
+                            : "secondary"
                       }
                       className="text-xs"
                     >
                       {alert.severity === "high"
                         ? "Khẩn cấp"
                         : alert.severity === "medium"
-                        ? "Quan trọng"
-                        : "Thông tin"}
+                          ? "Quan trọng"
+                          : "Thông tin"}
                     </Badge>
                   </div>
                 ))}
@@ -321,41 +347,7 @@ export default function ManagerDashboard() {
             </CardContent>
           </Card>
 
-          <div className="mt-6">
-            <LeafletMap
-              height="280px"
-              center={{ lat: 10.8231, lng: 106.6297 }}
-              zoom={12}
-              markers={[
-                {
-                  id: "bus1",
-                  position: { lat: 10.8231, lng: 106.6297 },
-                  title: "Xe 29A-12345",
-                  type: "bus",
-                  status: "active",
-                  info: "Đang hoạt động - Tuyến 1",
-                },
-                {
-                  id: "bus2",
-                  position: { lat: 10.835, lng: 106.64 },
-                  title: "Xe 29A-67890",
-                  type: "bus",
-                  status: "active",
-                  info: "Đang hoạt động - Tuyến 2",
-                },
-                {
-                  id: "bus3",
-                  position: { lat: 10.81, lng: 106.65 },
-                  title: "Xe 29A-11111",
-                  type: "bus",
-                  status: "warning",
-                  info: "Tạm dừng - Tuyến 3",
-                },
-              ]}
-              showTraffic={false}
-              showControls={true}
-            />
-          </div>
+
         </div>
       </div>
     </div>

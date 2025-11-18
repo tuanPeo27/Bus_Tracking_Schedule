@@ -488,50 +488,6 @@ export default function ManagerDrivers() {
 
       {/* Performance Overview */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Top tài xế xuất sắc</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {drivers
-                .sort((a, b) => b.onTimeRate - a.onTimeRate)
-                .slice(0, 5)
-                .map((driver, index) => (
-                  <div
-                    key={driver.id}
-                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium ${
-                        index === 0
-                          ? "bg-yellow-500"
-                          : index === 1
-                          ? "bg-gray-400"
-                          : index === 2
-                          ? "bg-orange-500"
-                          : "bg-blue-500"
-                      }`}
-                    >
-                      {index + 1}
-                    </div>
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback>
-                        {getInitials(driver.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="font-medium">{driver.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {driver.totalTrips} chuyến • {driver.onTimeRate}% đúng
-                        giờ
-                      </p>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>
@@ -724,7 +680,7 @@ export default function ManagerDrivers() {
                   <h4 className="font-medium">Phân công hiện tại</h4>
                   <div className="space-y-2">
                     {selectedDriver.currentRoute &&
-                    selectedDriver.currentVehicle ? (
+                      selectedDriver.currentVehicle ? (
                       <>
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4 text-muted-foreground" />

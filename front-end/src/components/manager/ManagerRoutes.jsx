@@ -29,7 +29,7 @@ export default function DriverNotifications({ driverId }) {
       content:
         "Lịch trình ngày mai (20/12) đã được thay đổi. Thời gian bắt đầu từ 06:30 thay vì 07:00. Vui lòng xác nhận đã nhận được thông báo.",
       sender: "Phòng Điều Hành",
-      senderType: "manager",
+      senderType: "admin",
       timestamp: new Date(Date.now() - 30 * 60 * 1000),
       isRead: false,
       requiresAction: true,
@@ -53,7 +53,7 @@ export default function DriverNotifications({ driverId }) {
       content:
         "Xe 29A-12345 đã đến hạn bảo dưỡng định kỳ. Vui lòng đưa xe đến garage vào cuối tuần này.",
       sender: "Phòng Kỹ Thuật",
-      senderType: "manager",
+      senderType: "admin",
       timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
       isRead: true,
       requiresAction: false,
@@ -150,11 +150,11 @@ export default function DriverNotifications({ driverId }) {
       .join("")
       .slice(0, 2);
     const bgColor =
-      senderType === "manager"
+      senderType === "admin"
         ? "bg-blue-500"
         : senderType === "parent"
-        ? "bg-green-500"
-        : "bg-gray-500";
+          ? "bg-green-500"
+          : "bg-gray-500";
 
     return (
       <Avatar className="w-8 h-8">
@@ -259,11 +259,10 @@ export default function DriverNotifications({ driverId }) {
         {filteredNotifications.map((notification) => (
           <Card
             key={notification.id}
-            className={`${
-              !notification.isRead
-                ? "border-l-4 border-l-blue-500 bg-blue-50/30"
-                : ""
-            }`}
+            className={`${!notification.isRead
+              ? "border-l-4 border-l-blue-500 bg-blue-50/30"
+              : ""
+              }`}
           >
             <CardContent className="p-4">
               <div className="flex items-start gap-4">
@@ -300,11 +299,11 @@ export default function DriverNotifications({ driverId }) {
                       <div className="text-sm">
                         <p className="font-medium">{notification.sender}</p>
                         <p className="text-muted-foreground">
-                          {notification.senderType === "manager"
+                          {notification.senderType === "admin"
                             ? "Quản lý"
                             : notification.senderType === "parent"
-                            ? "Phụ huynh"
-                            : "Hệ thống"}
+                              ? "Phụ huynh"
+                              : "Hệ thống"}
                         </p>
                       </div>
                     </div>
@@ -370,8 +369,8 @@ export default function DriverNotifications({ driverId }) {
                 {filter === "unread"
                   ? "Bạn đã đọc hết tất cả thông báo."
                   : filter === "important"
-                  ? "Không có thông báo quan trọng nào."
-                  : "Không tìm thấy thông báo phù hợp."}
+                    ? "Không có thông báo quan trọng nào."
+                    : "Không tìm thấy thông báo phù hợp."}
               </p>
             </CardContent>
           </Card>

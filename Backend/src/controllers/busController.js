@@ -1,4 +1,6 @@
 const Bus = require("../models/bus");
+const Schedule = require("../models/schedule");
+const Route = require("../models/route");
 
 exports.getAllBuses = async (req, res) => {
   try {
@@ -31,6 +33,63 @@ exports.getBusById = async (req, res) => {
   } catch (error) {
     console.error("Lỗi lấy thông tin xe buýt:", error);
     res.status(500).json({ EC: -1, EM: "Lỗi server.", DT: null });
+  }
+};
+
+exports.getBusByDriverId = async (req, res) => {
+  try {
+    const driverId = req.params.id;
+
+    const schedule = await Schedule.findOne({
+      where: { driver_id: driverId },
+      attributes: [
+        "id",
+        "date",
+        "status",
+        "start_time",
+        "end_time",
+        "route_id",
+        "bus_id",
+        "driver_id",
+      ],
+    });
+
+    if (!schedule) {
+      return res.status(404).json({
+        EC: 1,
+        EM: "Không tìm thấy lịch làm việc của tài xế.",
+        DT: null,
+      });
+    }
+
+    const route = await Route.findByPk(schedule.route_id);
+
+    const bus = await Bus.findByPk(schedule.bus_id);
+
+    if (!bus) {
+      return res.status(404).json({
+        EC: 1,
+        EM: "Xe buýt không tồn tại.",
+        DT: null,
+      });
+    }
+
+    res.status(200).json({
+      EC: 0,
+      EM: "Lấy thông tin xe buýt thành công.",
+      DT: {
+        bus,
+        schedule,
+        route,
+      },
+    });
+  } catch (error) {
+    console.error("Lỗi lấy thông tin xe buýt:", error);
+    res.status(500).json({
+      EC: -1,
+      EM: "Lỗi server khi lấy thông tin xe buýt.",
+      DT: null,
+    });
   }
 };
 

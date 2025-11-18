@@ -75,7 +75,7 @@ export function ChangePassword({ username, userRole }) {
     switch (userRole) {
       case "driver":
         return "text-green-600";
-      case "manager":
+      case "admin":
         return "text-blue-600";
       case "parent":
         return "text-purple-600";
@@ -93,9 +93,8 @@ export function ChangePassword({ username, userRole }) {
         <div>
           <h2 className={isMobile ? "text-lg" : "text-2xl"}>Đổi mật khẩu</h2>
           <p
-            className={`text-muted-foreground ${
-              isMobile ? "text-xs" : "text-sm"
-            }`}
+            className={`text-muted-foreground ${isMobile ? "text-xs" : "text-sm"
+              }`}
           >
             Thay đổi mật khẩu đăng nhập của bạn
           </p>
@@ -189,13 +188,12 @@ export function ChangePassword({ username, userRole }) {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className={`${
-                  userRole === "driver"
-                    ? "bg-green-600 hover:bg-green-700"
-                    : userRole === "manager"
+                className={`${userRole === "driver"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : userRole === "admin"
                     ? "bg-blue-600 hover:bg-blue-700"
                     : "bg-purple-600 hover:bg-purple-700"
-                }`}
+                  }`}
               >
                 {isLoading ? "Đang xử lý..." : "Đổi mật khẩu"}
               </Button>
