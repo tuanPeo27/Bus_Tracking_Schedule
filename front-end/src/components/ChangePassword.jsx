@@ -3,18 +3,17 @@ import Cookies from "js-cookie";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
+  CardDescription,
   CardTitle,
 } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Alert, AlertDescription } from "./ui/alert";
-import { Eye, EyeOff, CheckCircle, AlertCircle, KeyRound } from "lucide-react";
-import { toast } from "sonner";
+import { Eye, EyeOff, KeyRound } from "lucide-react";
 import { useIsMobile } from "./ui/use-mobile";
 import { userChangePassword } from "../service/loginChange";
+import { useNotificationHelpers } from "./useNotificationHelpers";
 
 export function ChangePassword({ username, userRole }) {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -23,26 +22,23 @@ export function ChangePassword({ username, userRole }) {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const isMobile = useIsMobile();
+  const { showSuccess, showError } = useNotificationHelpers();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
-    setSuccess(false);
 
     if (newPassword.length < 6) {
-      return setError("Mật khẩu mới phải có ít nhất 6 ký tự");
+      return showError("Mật khẩu mới phải có ít nhất 6 ký tự");
     }
 
     if (newPassword !== confirmPassword) {
-      return setError("Mật khẩu mới và xác nhận không khớp");
+      return showError("Mật khẩu mới và xác nhận không khớp");
     }
 
     if (newPassword === currentPassword) {
-      return setError("Mật khẩu mới phải khác mật khẩu hiện tại");
+      return showError("Mật khẩu mới phải khác mật khẩu hiện tại");
     }
 
     setIsLoading(true);
@@ -55,9 +51,7 @@ export function ChangePassword({ username, userRole }) {
       });
 
       if (response.status === 200) {
-        toast.success("Đổi mật khẩu thành công");
-        setSuccess(true);
-
+        showSuccess("Đổi mật khẩu thành công");
         Cookies.remove("access_token");
         Cookies.remove("user_role");
         window.location.reload();
@@ -71,8 +65,7 @@ export function ChangePassword({ username, userRole }) {
       const message =
         err.response?.data?.message ||
         "Không thể đổi mật khẩu. Vui lòng kiểm tra lại.";
-      setError(message);
-      toast.error("Lỗi", { description: message });
+      showError(message);
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +75,7 @@ export function ChangePassword({ username, userRole }) {
     switch (userRole) {
       case "driver":
         return "text-green-600";
-      case "manager":
+      case "admin":
         return "text-blue-600";
       case "parent":
         return "text-purple-600";
@@ -100,9 +93,8 @@ export function ChangePassword({ username, userRole }) {
         <div>
           <h2 className={isMobile ? "text-lg" : "text-2xl"}>Đổi mật khẩu</h2>
           <p
-            className={`text-muted-foreground ${
-              isMobile ? "text-xs" : "text-sm"
-            }`}
+            className={`text-muted-foreground ${isMobile ? "text-xs" : "text-sm"
+              }`}
           >
             Thay đổi mật khẩu đăng nhập của bạn
           </p>
@@ -118,21 +110,6 @@ export function ChangePassword({ username, userRole }) {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            {success && (
-              <Alert className="bg-green-50 text-green-900 border-green-200">
-                <CheckCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Mật khẩu đã được thay đổi thành công!
-                </AlertDescription>
-              </Alert>
-            )}
-
             <div>
               <Label>Mật khẩu hiện tại</Label>
               <div className="relative">
@@ -141,7 +118,6 @@ export function ChangePassword({ username, userRole }) {
                   placeholder="Nhập mật khẩu hiện tại"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
                 />
                 <Button
                   type="button"
@@ -163,7 +139,6 @@ export function ChangePassword({ username, userRole }) {
                   placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  required
                 />
                 <Button
                   type="button"
@@ -185,7 +160,6 @@ export function ChangePassword({ username, userRole }) {
                   placeholder="Nhập lại mật khẩu mới"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
                 />
                 <Button
                   type="button"
@@ -207,8 +181,6 @@ export function ChangePassword({ username, userRole }) {
                   setCurrentPassword("");
                   setNewPassword("");
                   setConfirmPassword("");
-                  setError("");
-                  setSuccess(false);
                 }}
               >
                 Hủy
@@ -216,13 +188,12 @@ export function ChangePassword({ username, userRole }) {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className={`${
-                  userRole === "driver"
-                    ? "bg-green-600 hover:bg-green-700"
-                    : userRole === "manager"
+                className={`${userRole === "driver"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : userRole === "admin"
                     ? "bg-blue-600 hover:bg-blue-700"
                     : "bg-purple-600 hover:bg-purple-700"
-                }`}
+                  }`}
               >
                 {isLoading ? "Đang xử lý..." : "Đổi mật khẩu"}
               </Button>

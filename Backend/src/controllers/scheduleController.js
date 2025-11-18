@@ -2,6 +2,7 @@ const Schedule = require("../models/schedule");
 const User = require("../models/user");
 const Route = require("../models/route");
 const Bus = require("../models/bus");
+const BusStop = require("../models/busStop");
 
 exports.getAllSchedules = async (req, res) => {
   try {
@@ -40,17 +41,70 @@ exports.getScheduleById = async (req, res) => {
 exports.getScheduleByDriverId = async (req, res) => {
   try {
     const driverId = req.params.driverId;
+
     const schedules = await Schedule.findAll({
       where: { driver_id: driverId },
+      attributes: [
+        "id",
+        "date",
+        "status",
+        "start_time",
+        "end_time",
+        "route_id",
+        "bus_id",
+      ],
+      order: [["date", "ASC"]],
     });
+
+    if (!schedules || schedules.length === 0) {
+      return res.status(404).json({
+        EC: 1,
+        EM: "Không tìm thấy lịch trình cho tài xế này.",
+        DT: null,
+      });
+    }
+
+    const routeIds = schedules.map((s) => s.route_id);
+    const busIds = schedules.map((s) => s.bus_id);
+
+    const buses = await Bus.findAll({
+      where: { id: busIds },
+    });
+
+    const routes = await Route.findAll({
+      where: { id: routeIds },
+    });
+
+    const stops = await BusStop.findAll({
+      where: { route_id: routeIds },
+      order: [["order_index", "ASC"]],
+    });
+
+    const data = schedules.map((schedule) => {
+      const route = routes.find((r) => r.id === schedule.route_id);
+      const routeStops = stops.filter((s) => s.route_id === route.id);
+      const bus = buses.find((b) => b.id === schedule.bus_id);
+
+      return {
+        ...schedule.toJSON(),
+        route: route ? route.toJSON() : null,
+        stops: routeStops,
+        bus: bus ? bus.toJSON() : null,
+      };
+    });
+
     res.status(200).json({
       EC: 0,
       EM: "Lấy danh sách lịch trình của tài xế thành công.",
-      DT: schedules,
+      DT: data,
     });
   } catch (error) {
-    console.error("Lỗi lấy lịch trình của tài xế:", error);
-    res.status(500).json({ EC: -1, EM: "Lỗi server.", DT: null });
+    console.error("❌ Lỗi lấy lịch trình của tài xế:", error);
+    res.status(500).json({
+      EC: -1,
+      EM: "Lỗi server.",
+      DT: null,
+    });
   }
 };
 
@@ -139,7 +193,7 @@ exports.editSchedule = async (req, res) => {
 exports.editScheduleById = async (req, res) => {
   try {
     const scheduleId = req.params.id;
-    const { date, time, route_id, bus_id, driver_id } = req.body;
+    const { date, time, route_id, bus_id, driver_id, status: scheduleStatus } = req.body;
     const schedule = await Schedule.findOne({
       where: { id: scheduleId },
     });
@@ -153,6 +207,7 @@ exports.editScheduleById = async (req, res) => {
     schedule.route_id = route_id || schedule.route_id;
     schedule.bus_id = bus_id || schedule.bus_id;
     schedule.driver_id = driver_id || schedule.driver_id;
+    schedule.status = scheduleStatus || schedule.status;
     await schedule.save();
     res.status(200).json({
       EC: 0,

@@ -1,4 +1,3 @@
-const e = require("express");
 const Route = require("../models/route");
 
 exports.getAllRoutes = async (req, res) => {

@@ -20,7 +20,7 @@ const BusStop = sequelize.define(
   },
   {
     tableName: "bus_stops",
-    timestamps: true,
+    timestamps: false,
   }
 );
 
