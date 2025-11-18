@@ -22,6 +22,7 @@ import {
   EyeOff,
   AlertCircle,
   LogIn,
+  Cookie,
 } from "lucide-react";
 
 export function LoginForm({ onLogin }) {
@@ -58,6 +59,10 @@ export function LoginForm({ onLogin }) {
           expires: 1 / 24,
           secure: window.location.protocol === "https:",
           sameSite: "lax",
+        });
+
+        Cookies.set("user_id", account.id, {
+          expires: 1 / 24,
         });
 
         const roleNames = {

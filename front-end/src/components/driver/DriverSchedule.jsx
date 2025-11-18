@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Card, CardContent } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
@@ -11,113 +11,41 @@ import {
   TableRow,
 } from "../ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-} from "../ui/dialog";
-import {
   Calendar,
   Clock,
-  Route,
   Bus,
-  MapPin,
-  Search,
   Eye,
-  CheckCircle,
 } from "lucide-react";
-import { Input } from "../ui/input";
+import { getSchedulesByDriverId } from "../../service/driverService";
+import Cookies from "js-cookie";
 
 export default function DriverSchedule({ onAcceptSchedule, activeScheduleId }) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedSchedule, setSelectedSchedule] = useState(null);
+  const [schedules, setSchedules] = useState([]);
 
-  const [schedules, setSchedules] = useState([
-    {
-      id: "LT001",
-      date: "2024-12-19",
-      startTime: "07:00",
-      endTime: "17:00",
-      route: "Tuyến 1: Bến xe Miền Đông - Trường THPT Nguyễn Du",
-      vehiclePlate: "29A-12345",
-      status: "completed", // Giả sử chuyến này đã hoàn thành
-      totalDistance: 45,
-      estimatedTime: "8h 30m",
-    },
-    {
-      id: "LT002",
-      date: "2024-12-20",
-      startTime: "06:30",
-      endTime: "16:30",
-      route: "Tuyến 2: Bến xe An Sương - Trường THCS Lê Quý Đôn",
-      vehiclePlate: "29A-12345",
-      status: "pending", // Thay đổi trạng thái để nút "Nhận" hiển thị
-      totalDistance: 38,
-      estimatedTime: "7h 45m",
-    },
-    {
-      id: "LT003",
-      date: "2024-12-21",
-      startTime: "07:15",
-      endTime: "17:15",
-      route: "Tuyến 3: Chợ Bình Tây - Trường THPT Marie Curie",
-      vehiclePlate: "29A-12345",
-      status: "scheduled",
-      totalDistance: 52,
-      estimatedTime: "9h 00m",
-    },
-    {
-      id: "LT004",
-      date: "2024-12-18",
-      startTime: "07:00",
-      endTime: "17:00",
-      route: "Tuyến 1: Bến xe Miền Đông - Trường THPT Nguyễn Du",
-      vehiclePlate: "29A-12345",
-      status: "completed",
-      totalDistance: 45,
-      estimatedTime: "8h 30m",
-    },
-  ]);
-
-  const routeDetails = {
-    LT001: {
-      stops: [
-        { name: "Bến xe Miền Đông", time: "07:00", distance: 0 },
-        { name: "Ngã tư Hàng Xanh", time: "07:15", distance: 5 },
-        { name: "Cầu Sài Gòn", time: "07:30", distance: 12 },
-        { name: "Chợ Thủ Đức", time: "07:45", distance: 18 },
-        { name: "Trường THPT Nguyễn Du", time: "08:00", distance: 25 },
-      ],
-      returnStops: [
-        { name: "Trường THPT Nguyễn Du", time: "16:30", distance: 0 },
-        { name: "Chợ Thủ Đức", time: "16:45", distance: 7 },
-        { name: "Cầu Sài Gòn", time: "17:00", distance: 13 },
-        { name: "Bến xe Miền Đông", time: "17:15", distance: 25 },
-      ],
-    },
-  };
-
-  // Sử dụng useEffect để cập nhật trạng thái một cách an toàn khi activeScheduleId thay đổi
-  useEffect(() => {
-    if (activeScheduleId) {
-      setSchedules((prevSchedules) =>
-        prevSchedules.map((schedule) =>
-          schedule.id === activeScheduleId
-            ? { ...schedule, status: "active" }
-            : schedule
-        )
-      );
+  const getScheduleDriverById = async () => {
+    try {
+      const res = await getSchedulesByDriverId(Cookies.get("user_id"));
+      if (res && res.data.EC === 0) {
+        setSchedules(res.data.DT);
+        console.log("Tất cả lịch trình của tài xế:", res.data.DT);
+      } else {
+        console.error("Lỗi lấy danh sách lịch trình:", res?.data?.EM);
+      }
+    } catch (err) {
+      console.error("Lỗi kết nối khi lấy lịch trình:", err);
     }
-  }, [activeScheduleId]);
+  };
+  
+
+  useEffect(() => {
+    getScheduleDriverById();
+  }, []);
 
   const getStatusBadge = (status) => {
     switch (status) {
       case "active":
-        return (
-          <Badge className="bg-green-100 text-green-800">Đang thực hiện</Badge>
-        );
+        return <Badge className="bg-green-100 text-green-800">Đang thực hiện</Badge>;
       case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800">Chờ nhận</Badge>;
       case "scheduled":
@@ -132,40 +60,18 @@ export default function DriverSchedule({ onAcceptSchedule, activeScheduleId }) {
   };
 
   const filteredSchedules = schedules.filter((schedule) => {
-    if (!searchTerm) return true; // Hiển thị tất cả nếu không có từ khóa tìm kiếm
+    if (!searchTerm) return true;
+    const keyword = searchTerm.toLowerCase();
+    if (!schedule.route) return false;
     return (
-      schedule.route.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      schedule.vehiclePlate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      schedule.date.includes(searchTerm)
+      schedule.route.name.toLowerCase().includes(keyword) ||
+      schedule.route.start_point.toLowerCase().includes(keyword) ||
+      schedule.route.end_point.toLowerCase().includes(keyword)
     );
   });
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Lịch trình của tôi
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm theo tuyến đường, biển số xe..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Schedule Table */}
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -174,7 +80,6 @@ export default function DriverSchedule({ onAcceptSchedule, activeScheduleId }) {
                 <TableHead>Ngày</TableHead>
                 <TableHead>Thời gian</TableHead>
                 <TableHead>Tuyến đường</TableHead>
-                <TableHead>Xe</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Thao tác</TableHead>
               </TableRow>
@@ -191,153 +96,30 @@ export default function DriverSchedule({ onAcceptSchedule, activeScheduleId }) {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      {schedule.startTime} - {schedule.endTime}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="max-w-xs">
-                      <p className="truncate">{schedule.route}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {schedule.totalDistance} km • {schedule.estimatedTime}
-                      </p>
+                      {schedule.start_time} - {schedule.end_time}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Bus className="w-4 h-4" />
-                      {schedule.vehiclePlate}
+                      {schedule.route.name + ": " + schedule.route.start_point + " - " + schedule.route.end_point}
                     </div>
                   </TableCell>
                   <TableCell>{getStatusBadge(schedule.status)}</TableCell>
                   <TableCell>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedSchedule(schedule)}
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Chi tiết
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl justify-center items-center">
-                        <DialogHeader>
-                          <DialogTitle>Chi tiết lịch trình</DialogTitle>
-                          <DialogDescription>
-                            Xem thông tin chi tiết và trạng thái của lịch trình
-                          </DialogDescription>
-                        </DialogHeader>
-                        {selectedSchedule && (
-                          <div className="space-y-6">
-                            {/* Schedule Info */}
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <p className="font-medium">Mã lịch trình</p>
-                                <p className="text-muted-foreground">
-                                  {selectedSchedule.id}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="font-medium">Ngày thực hiện</p>
-                                <p className="text-muted-foreground">
-                                  {new Date(
-                                    selectedSchedule.date
-                                  ).toLocaleDateString("vi-VN")}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="font-medium">Thời gian</p>
-                                <p className="text-muted-foreground">
-                                  {selectedSchedule.startTime} -{" "}
-                                  {selectedSchedule.endTime}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="font-medium">Xe được gán</p>
-                                <p className="text-muted-foreground">
-                                  {selectedSchedule.vehiclePlate}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Route Details */}
-                            {routeDetails[selectedSchedule.id] && (
-                              <div className="space-y-4">
-                                <h4 className="font-medium">
-                                  Điểm dừng trên tuyến
-                                </h4>
-
-                                <div className="space-y-4">
-                                  <div>
-                                    <h5 className="text-sm font-medium mb-2">
-                                      Lượt đi
-                                    </h5>
-                                    <div className="space-y-2">
-                                      {routeDetails[
-                                        selectedSchedule.id
-                                      ].stops.map((stop, index) => (
-                                        <div
-                                          key={index}
-                                          className="flex items-center gap-3 p-2 bg-gray-50 rounded"
-                                        >
-                                          <MapPin className="w-4 h-4 text-blue-600" />
-                                          <div className="flex-1">
-                                            <p className="font-medium">
-                                              {stop.name}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                              {stop.time} • Cách {stop.distance}{" "}
-                                              km
-                                            </p>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  <div>
-                                    <h5 className="text-sm font-medium mb-2">
-                                      Lượt về
-                                    </h5>
-                                    <div className="space-y-2">
-                                      {routeDetails[
-                                        selectedSchedule.id
-                                      ].returnStops.map((stop, index) => (
-                                        <div
-                                          key={index}
-                                          className="flex items-center gap-3 p-2 bg-gray-50 rounded"
-                                        >
-                                          <MapPin className="w-4 h-4 text-green-600" />
-                                          <div className="flex-1">
-                                            <p className="font-medium">
-                                              {stop.name}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                              {stop.time} • Cách {stop.distance}{" "}
-                                              km
-                                            </p>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </DialogContent>
-                    </Dialog>
-                    {schedule.status === "pending" && (
+                    <div className="flex items-center gap-2">
                       <Button
                         size="sm"
-                        onClick={() => onAcceptSchedule(schedule)}
+                        variant="outline"
+                        onClick={() => {
+                          onAcceptSchedule(schedule); 
+                        }}
+                        disabled={activeScheduleId === schedule.id}
                       >
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Nhận
+                        <Eye className="w-4 h-4 mr-1" />
+                        {activeScheduleId === schedule.id ? "Đang xem" : "Chi tiết"}
                       </Button>
-                    )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

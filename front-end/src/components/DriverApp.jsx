@@ -28,7 +28,7 @@ import DriverNotifications from "./driver/DriverNotifications";
 import DriverStatus from "./driver/DriverStatus";
 import DriverStudents from "./driver/DriverStudents";
 import { ChangePassword } from "./ChangePassword";
-import { getInfoDriver } from "../service/driverService";
+import { getInfoDriver, getInfoVehicle, getDriverSchedule } from "../service/driverService";
 import Cookies from "js-cookie";
 
 export function DriverApp({ onBack }) {
@@ -36,12 +36,12 @@ export function DriverApp({ onBack }) {
   const [activeSchedule, setActiveSchedule] = useState(null);
   const [driverStatus, setDriverStatus] = useState("active");
   const [driverInfo, setDriverInfo] = useState(null);
-
+  const [currentVehicle, setVehicleInfo] = useState(null);
   const { system } = useNotificationHelpers();
   const { clearAll } = useNotifications();
   const isMobile = useIsMobile();
 
-  // 🚗 Lấy thông tin tài xế từ server
+  // Lấy thông tin tài xế từ server
   const getDriverInfo = async () => {
     try {
       const res = await getInfoDriver(Cookies.get("user_id"));
@@ -56,73 +56,73 @@ export function DriverApp({ onBack }) {
     }
   };
 
+  // Lấy thông tin xe từ server
+  const getVehicleInfo = async () => {
+    try {
+      const res = await getInfoVehicle(Cookies.get("user_id"));
+      if (res && res.data.EC === 0) {
+        setVehicleInfo(res.data.DT);
+        console.log("Thông tin xe:", res.data.DT);
+      } else {
+        console.error("Lỗi lấy thông tin xe:", res?.data?.EM);
+      }
+    } catch (err) {
+      console.error("Lỗi kết nối khi lấy thông tin xe:", err);
+    }
+  };
+
   useEffect(() => {
     getDriverInfo();
+    getVehicleInfo();
   }, []);
 
-  // 🚪 Đăng xuất
+  // Đăng xuất
   const handleLogout = () => {
     clearAll();
     system.logout();
     if (typeof onBack === "function") onBack();
   };
 
-  // ✅ Khi tài xế nhận lịch trình
   const handleAcceptSchedule = (schedule) => {
+    console.log("Đã chọn lịch trình:", schedule); 
     setActiveSchedule(schedule);
-    setActiveTab("students"); // Chuyển sang tab học sinh
+    setActiveTab("students");
   };
 
-  // ✅ Khi tài xế hoàn thành chuyến đi
-  const handleCompleteSchedule = () => {
-    if (activeSchedule) {
-      system.success("Hoàn thành chuyến đi", `Đã kết thúc lịch trình ${activeSchedule.id}.`);
-    }
-    setActiveSchedule(null);
-    setActiveTab("schedule");
-  };
+  // Khi tài xế hoàn thành chuyến đi
+  // const handleCompleteSchedule = () => {
+  //   if (activeSchedule) {
+  //     system.success(
+  //       "Hoàn thành chuyến đi",
+  //       `Đã kết thúc lịch trình ${activeSchedule.id}.`
+  //     );
+  //   }
+  //   setActiveSchedule(null);
+  //   setActiveTab("schedule");
+  // };
 
-  // 🚦 Hàm hiển thị màu trạng thái
+  // Hàm hiển thị màu trạng thái
   const getStatusColor = (status) => {
     switch (status) {
-      case "active":
-        return "bg-green-500";
-      case "break":
-        return "bg-yellow-500";
-      case "incident":
-        return "bg-red-500";
-      case "offline":
-        return "bg-gray-500";
-      default:
-        return "";
+      case "active": return "bg-green-500";
+      case "break": return "bg-yellow-500";
+      case "incident": return "bg-red-500";
+      case "offline": return "bg-gray-500";
+      default: return "";
     }
   };
 
-  // 🚦 Hàm hiển thị nội dung trạng thái
+  //  Hàm hiển thị nội dung trạng thái
   const getStatusText = (status) => {
     switch (status) {
-      case "active":
-        return "Đang hoạt động";
-      case "break":
-        return "Nghỉ giải lao";
-      case "incident":
-        return "Sự cố";
-      case "offline":
-        return "Ngoại tuyến";
-      default:
-        return "";
+      case "active": return "Đang hoạt động";
+      case "break": return "Nghỉ giải lao";
+      case "incident": return "Sự cố";
+      case "offline": return "Ngoại tuyến";
+      default: return "";
     }
   };
 
-  // 🚐 Xe hiện tại (tạm thời hardcode)
-  const currentVehicle = {
-    id: "XE001",
-    licensePlate: "29A-12345",
-    brand: "Hyundai Universe",
-    seats: 45,
-    avgSpeed: 35,
-    status: "active",
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -142,23 +142,22 @@ export function DriverApp({ onBack }) {
               )}
             </div>
           </div>
-
           <div className="flex items-center gap-2 md:gap-4">
             {!isMobile && (
               <div className="flex items-center gap-2">
                 <div
-                  className={`w-3 h-3 rounded-full ${getStatusColor(driverStatus)}`}
+                  className={`w-3 h-3 rounded-full ${getStatusColor(
+                    driverStatus
+                  )}`}
                 />
                 <span className="text-sm">{getStatusText(driverStatus)}</span>
               </div>
             )}
-
             <Avatar className={isMobile ? "w-8 h-8" : ""}>
               <AvatarFallback className={isMobile ? "text-sm" : ""}>
                 {driverInfo?.avatar || "DRV"}
               </AvatarFallback>
             </Avatar>
-
             <Button
               variant="outline"
               size="sm"
@@ -186,7 +185,6 @@ export function DriverApp({ onBack }) {
                 <User className="w-4 h-4" />
                 {isMobile ? "Tổng quan" : "Tổng quan"}
               </AnimatedTabsTrigger>
-
               <AnimatedTabsTrigger value="schedule">
                 <Calendar className="w-4 h-4" />
                 {isMobile ? "Lịch" : "Lịch trình"}
@@ -210,12 +208,10 @@ export function DriverApp({ onBack }) {
                 <Bell className="w-4 h-4" />
                 {isMobile ? "T.báo" : "Thông báo"}
               </AnimatedTabsTrigger>
-
               <AnimatedTabsTrigger value="status">
                 <AlertCircle className="w-4 h-4" />
                 {isMobile ? "T.thái" : "Trạng thái"}
               </AnimatedTabsTrigger>
-
               <AnimatedTabsTrigger value="password">
                 <KeyRound className="w-4 h-4" />
                 {isMobile ? "Đổi MK" : "Đổi mật khẩu"}
@@ -243,14 +239,30 @@ export function DriverApp({ onBack }) {
             />
           </AnimatedTabsContent>
 
-          {activeSchedule && (
+          {activeSchedule ? (
             <>
               <AnimatedTabsContent value="students">
-                <DriverStudents driverId={driverInfo?.id} />
+                <DriverStudents scheduleId={activeSchedule.id} />
               </AnimatedTabsContent>
 
               <AnimatedTabsContent value="gps">
-                <DriverGPS vehicleId={activeSchedule?.vehiclePlate} />
+                <DriverGPS
+                  route_id={activeSchedule?.route?.id || activeSchedule?.route_id}
+                  vehicle_id={currentVehicle?.id}
+                />
+              </AnimatedTabsContent>
+            </>
+          ) : (
+            <>
+              <AnimatedTabsContent value="students">
+                <p className="p-4 text-center text-gray-500">
+                  Hãy chọn một lịch trình để xem chi tiết.
+                </p>
+              </AnimatedTabsContent>
+              <AnimatedTabsContent value="gps">
+                <p className="p-4 text-center text-gray-500">
+                  Hãy chọn một lịch trình để xem chi tiết.
+                </p>
               </AnimatedTabsContent>
             </>
           )}
