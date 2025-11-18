@@ -93,7 +93,7 @@ export default function DriverGPS({ route_id, vehicle_id }) {
       }
       const json = await res.json();
       const coords = json?.features?.[0]?.geometry?.coordinates || [];
-      console.log("Segment fetched:", coords);
+      console
       return coords.map((c) => ({ lat: c[1], lng: c[0] }));
     } catch (err) {
       console.warn("Routing fail:", err);
