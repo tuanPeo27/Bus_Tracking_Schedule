@@ -5,6 +5,9 @@ const { verifyToken, authorizeAdmin } = require("../middleware/authMiddleware");
 
 router.get("/", verifyToken, routeController.getAllRoutes);
 router.get("/:id", verifyToken, routeController.getRouteById);
+
+router.get("/student/:id", verifyToken, routeController.getRouteByStudentId);
+
 router.post(
   "/create",
   verifyToken,

@@ -1,5 +1,7 @@
+const Route = require("../models/route");
 const Schedule = require("../models/schedule");
 const Student = require("../models/student");
+const Parent = require("../models/user");
 
 exports.getAllStudents = async (req, res) => {
   try {
@@ -11,6 +13,8 @@ exports.getAllStudents = async (req, res) => {
         "school",
         "pickup_point",
         "dropoff_point",
+        "parent_id",
+        "route_id",
       ],
     });
 
@@ -37,6 +41,8 @@ exports.getStudentsByRouteId = async (req, res) => {
         "school",
         "pickup_point",
         "dropoff_point",
+        "parent_id",
+        "route_id",
       ],
     });
     res.status(200).json({
@@ -77,7 +83,54 @@ exports.getStudentsByParentId = async (req, res) => {
 
 exports.createStudent = async (req, res) => {
   try {
-    const student = await Student.create({ ...req.body });
+    const {
+      name,
+      age,
+      school,
+      pickup_point,
+      dropoff_point,
+      parent_id,
+      route_id,
+    } = req.body;
+
+    if (
+      !name ||
+      !age ||
+      !school ||
+      !pickup_point ||
+      !dropoff_point ||
+      !parent_id ||
+      !route_id
+    ) {
+      return res
+        .status(400)
+        .json({ EC: 1, EM: "Thêm học sinh khóa.", DT: null });
+    }
+
+    const parent = await Parent.findByPk(parent_id);
+    if (!parent) {
+      return res
+        .status(404)
+        .json({ EC: 1, EM: "Phụ huynh không tìm thấy.", DT: null });
+    }
+
+    const route = await Route.findByPk(route_id);
+    if (!route) {
+      return res
+        .status(404)
+        .json({ EC: 1, EM: "Tuyến đường không tìm thấy.", DT: null });
+    }
+
+    const student = await Student.create({
+      name,
+      age,
+      school,
+      pickup_point,
+      dropoff_point,
+      parent_id,
+      route_id,
+    });
+
     res
       .status(201)
       .json({ EC: 0, EM: "Thêm học sinh thành công", DT: student });
