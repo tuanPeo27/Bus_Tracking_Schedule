@@ -129,6 +129,12 @@ export function useNotificationHelpers() {
       ),
   };
 
+  const locationError = (message) => showError(
+    'Lỗi GPS',
+    `Không thể lấy vị trí: ${message}. Vui lòng kiểm tra quyền truy cập vị trí và tín hiệu GPS.`,
+    7000
+  );
+
   return {
     showSuccess,
     showError,

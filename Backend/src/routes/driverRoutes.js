@@ -21,4 +21,11 @@ router.put(
   driverController.editDriverById
 );
 
+router.delete(
+  "/delete/:id",
+  verifyToken,
+  authorizeAdmin,
+  driverController.deleteDriver
+);
+
 module.exports = router;

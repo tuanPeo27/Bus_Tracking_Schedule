@@ -5,6 +5,7 @@ const { verifyToken, authorizeAdmin } = require("../middleware/authMiddleware");
 
 router.post("/login", userController.login);
 router.post("/forgotpass", userController.forgotPass);
+
 router.post(
   "/create/admin",
   verifyToken,
