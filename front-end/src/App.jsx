@@ -47,10 +47,10 @@ export default function App() {
         </>
       )}
 
-      {userRole === "manager" && (
+      {userRole === "admin" && (
         <>
           <ManagerApp onBack={handleLogout} />
-          <NotificationDemo userRole="manager" loginKey={loginKey} />
+          <NotificationDemo userRole="admin" loginKey={loginKey} />
           <NotificationPanel />
           <Toaster />
         </>

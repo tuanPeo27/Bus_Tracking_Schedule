@@ -8,4 +8,8 @@ const getInfoStudent = async (idUser) => {
     return instance.get(`students/parent/${idUser}`);
 };
 
-export { getInfoParent, getInfoStudent };
+const getRouteByStudentId = async (idStudent) => {
+    return instance.get(`routes/student/${idStudent}`);
+};
+
+export { getInfoParent, getInfoStudent, getRouteByStudentId };

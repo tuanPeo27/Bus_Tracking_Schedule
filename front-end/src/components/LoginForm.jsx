@@ -22,6 +22,7 @@ import {
   EyeOff,
   AlertCircle,
   LogIn,
+  Cookie,
 } from "lucide-react";
 
 export function LoginForm({ onLogin }) {
@@ -66,10 +67,9 @@ export function LoginForm({ onLogin }) {
 
         const roleNames = {
           driver: "Tài xế",
-          manager: "Quản lý",
+          admin: "Quản lý",
           parent: "Phụ huynh",
         };
-
         system.login(roleNames[account.role]);
         onLogin(account.role);
       } else {

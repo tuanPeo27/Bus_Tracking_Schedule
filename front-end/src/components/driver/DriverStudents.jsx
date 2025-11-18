@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
+import Cookies from "js-cookie";
 import {
   Table,
   TableBody,
@@ -19,102 +19,100 @@ import {
   DialogTrigger,
   DialogDescription,
 } from "../ui/dialog";
-import { Checkbox } from "../ui/checkbox";
 import { useNotificationHelpers } from "../useNotificationHelpers";
 import {
-  Users,
-  Search,
   MapPin,
   Clock,
   Phone,
   CheckCircle,
   XCircle,
   AlertCircle,
-  UserCheck,
   Eye,
   School,
+  Route,
 } from "lucide-react";
+import { getStudentsByScheduleId } from "../../service/driverService";
 
-export default function DriverStudents({ driverId }) {
-  const [searchTerm, setSearchTerm] = useState("");
+export default function DriverStudents({ scheduleId }) {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [attendanceFilter, setAttendanceFilter] = useState("all");
   const { showSuccess, showInfo } = useNotificationHelpers();
 
-  // Mock data for students on today's route
-  const [students, setStudents] = useState([
-    {
-      id: "HS001",
-      name: "Nguyễn Minh An",
-      class: "10A1",
-      school: "THPT Nguyễn Du",
-      parentName: "Nguyễn Văn Bình",
-      parentPhone: "0901234567",
-      pickupLocation: "Ngã tư Hàng Xanh",
-      dropoffLocation: "THPT Nguyễn Du",
-      pickupTime: "07:15",
-      dropoffTime: "16:45",
-      attendance: "present",
-      avatar: "NMA",
-    },
-    {
-      id: "HS002",
-      name: "Trần Thị Bảo",
-      class: "10A2",
-      school: "THPT Nguyễn Du",
-      parentName: "Trần Văn Cường",
-      parentPhone: "0902345678",
-      pickupLocation: "Cầu Sài Gòn",
-      dropoffLocation: "THPT Nguyễn Du",
-      pickupTime: "07:30",
-      dropoffTime: "16:45",
-      attendance: "pending",
-      avatar: "TTB",
-    },
-    {
-      id: "HS003",
-      name: "Lê Hoàng Dũng",
-      class: "10B1",
-      school: "THPT Nguyễn Du",
-      parentName: "Lê Thị Hoa",
-      parentPhone: "0903456789",
-      pickupLocation: "Chợ Thủ Đức",
-      dropoffLocation: "THPT Nguyễn Du",
-      pickupTime: "07:45",
-      dropoffTime: "16:45",
-      attendance: "absent",
-      avatar: "LHD",
-      notes: "Học sinh báo nghỉ ốm",
-    },
-    {
-      id: "HS004",
-      name: "Phạm Mai Linh",
-      class: "10A3",
-      school: "THPT Nguyễn Du",
-      parentName: "Phạm Văn Nam",
-      parentPhone: "0904567890",
-      pickupLocation: "Ngã tư Hàng Xanh",
-      dropoffLocation: "THPT Nguyễn Du",
-      pickupTime: "07:15",
-      dropoffTime: "16:45",
-      attendance: "present",
-      avatar: "PML",
-    },
-    {
-      id: "HS005",
-      name: "Võ Thanh Tùng",
-      class: "10B2",
-      school: "THPT Nguyễn Du",
-      parentName: "Võ Thị Lan",
-      parentPhone: "0905678901",
-      pickupLocation: "Bến xe Miền Đông",
-      dropoffLocation: "THPT Nguyễn Du",
-      pickupTime: "07:00",
-      dropoffTime: "16:45",
-      attendance: "pending",
-      avatar: "VTT",
-    },
-  ]);
+  // Khởi tạo students từ localStorage nếu có
+  const [students, setStudents] = useState(() => {
+    const savedStudents = localStorage.getItem('driverStudents');
+    return savedStudents ? JSON.parse(savedStudents) : [];
+  });
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [scheduleInfo, setScheduleInfo] = useState(null);
+
+  const fetchStudentsForSchedule = async (id) => {
+    if (id === null || id === undefined || id === "") {
+      console.warn("scheduleId không hợp lệ, bỏ qua fetch. Giá trị hiện tại:", id, "Type:", typeof id);
+      return;
+    }
+    console.log("scheduleId hợp lệ, bắt đầu fetch:", id);
+    setIsLoading(true);
+    try {
+      const response = await getStudentsByScheduleId(id);
+      console.log("Response từ API:", response);
+      if (response && response.data && response.data.EC === 0) {
+        const data = response.data.DT;
+        console.log("Dữ liệu DT:", data);
+
+        setScheduleInfo({
+          schedule_id: data.schedule_id,
+          route_id: data.route_id,
+        });
+
+        const studentsFromApi = Array.isArray(data.students) ? data.students : [];
+        console.log("studentsFromApi:", studentsFromApi);
+
+        if (studentsFromApi.length > 0) {
+          const studentsWithAttendance = studentsFromApi.map((student) => {
+            if (!student || typeof student !== "object") {
+              console.warn("Student không hợp lệ:", student);
+              return null;
+            }
+            return {
+              ...student,
+              attendance: "pending",
+            };
+          }).filter(Boolean);
+
+          console.log("studentsWithAttendance:", studentsWithAttendance);
+
+          if (studentsWithAttendance.length > 0) {
+            setStudents(studentsWithAttendance); // Set state và lưu vào localStorage
+            localStorage.setItem('driverStudents', JSON.stringify(studentsWithAttendance)); // Lưu lại
+          } else {
+            console.warn("Không có student hợp lệ, giữ state cũ.");
+          }
+        } else {
+          console.warn("data.students rỗng, giữ state cũ.");
+        }
+      } else {
+        const errorMsg = response?.data?.EM || "Lỗi không xác định từ API";
+        console.error("Lỗi lấy danh sách học sinh:", errorMsg);
+        showInfo("Lỗi tải dữ liệu", errorMsg);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách học sinh:", error);
+      showInfo("Lỗi mạng", "Không thể tải danh sách học sinh. Vui lòng thử lại.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    console.log("useEffect chạy với scheduleId:", scheduleId, "Type:", typeof scheduleId);
+    fetchStudentsForSchedule(scheduleId);
+  }, [scheduleId]);
+
+  useEffect(() => {
+    console.log("Học sinh SAU KHI set (state hiện tại):", students);
+  }, [students]);
 
   const updateAttendance = (studentId, attendance) => {
     const student = students.find((s) => s.id === studentId);
@@ -124,17 +122,10 @@ export default function DriverStudents({ driverId }) {
       prev.map((s) => (s.id === studentId ? { ...s, attendance } : s))
     );
 
-    // Hiển thị thông báo dựa trên trạng thái
     if (attendance === "present") {
-      showSuccess(
-        `Xác nhận thành công`,
-        `${student.name} đã được đánh dấu có mặt`
-      );
+      showSuccess(`Xác nhận thành công`, `${student.name} đã được đánh dấu có mặt`);
     } else {
-      showInfo(
-        `Cập nhật điểm danh`,
-        `${student.name} đã được đánh dấu vắng mặt`
-      );
+      showInfo(`Cập nhật điểm danh`, `${student.name} đã được đánh dấu vắng mặt`);
     }
   };
 
@@ -145,9 +136,9 @@ export default function DriverStudents({ driverId }) {
       case "absent":
         return <Badge className="bg-red-100 text-red-800">Vắng mặt</Badge>;
       case "pending":
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800">Chờ xác nhận</Badge>
-        );
+        return <Badge className="bg-yellow-100 text-yellow-800">Chờ xác nhận</Badge>;
+      default:
+        return <Badge variant="outline">Chưa rõ</Badge>;
     }
   };
 
@@ -162,149 +153,65 @@ export default function DriverStudents({ driverId }) {
     }
   };
 
-  const filteredStudents = students.filter((student) => {
-    const matchesSearch =
-      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.class.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.pickupLocation.toLowerCase().includes(searchTerm.toLowerCase());
+  const studentList = Array.isArray(students) ? students : [];
 
+  const filteredStudents = studentList.filter((student) => {
+    if (!student || typeof student !== "object") {
+      return false;
+    }
+    
     const matchesFilter =
       attendanceFilter === "all" || student.attendance === attendanceFilter;
 
-    return matchesSearch && matchesFilter;
+    return matchesFilter;
   });
 
-  const attendanceStats = {
-    total: students.length,
-    present: students.filter((s) => s.attendance === "present").length,
-    absent: students.filter((s) => s.attendance === "absent").length,
-    pending: students.filter((s) => s.attendance === "pending").length,
-  };
+  console.log("GIÁ TRỊ LỌC CUỐI CÙNG:", {
+    attendanceFilter: attendanceFilter,
+    studentsLength: studentList.length,
+    filteredLength: filteredStudents.length,
+  });
+
+  if (isLoading) {
+    return <div className="text-center p-4">Đang tải danh sách học sinh...</div>;
+  }
+
+  if (!students || students.length === 0) {
+    return (
+      <div className="text-center p-4 text-muted-foreground">
+        Không có học sinh nào trong lịch trình này. (Nếu đã có dữ liệu trước đó, hãy kiểm tra scheduleId.)
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header & Stats */}
-      <div className="grid md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <Users className="w-8 h-8 text-blue-600" />
-              <div>
-                <p className="text-2xl font-bold">{attendanceStats.total}</p>
-                <p className="text-sm text-muted-foreground">Tổng học sinh</p>
-              </div>
-            </div>
+    <div className="space-y-4">
+      {scheduleInfo && (
+        <Card className="border border-blue-200 bg-blue-50 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg text-blue-800 flex items-center gap-2">
+              <Route className="w-5 h-5 text-blue-600" />
+              Thông tin lịch trình
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-gray-700">
+            <p>
+              <strong>Mã lịch trình:</strong> {scheduleInfo.schedule_id}
+            </p>
+            <p>
+              <strong>Mã tuyến đường:</strong> {scheduleInfo.route_id}
+            </p>
           </CardContent>
         </Card>
+      )}
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-              <div>
-                <p className="text-2xl font-bold text-green-600">
-                  {attendanceStats.present}
-                </p>
-                <p className="text-sm text-muted-foreground">Có mặt</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <XCircle className="w-8 h-8 text-red-600" />
-              <div>
-                <p className="text-2xl font-bold text-red-600">
-                  {attendanceStats.absent}
-                </p>
-                <p className="text-sm text-muted-foreground">Vắng mặt</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-8 h-8 text-yellow-600" />
-              <div>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {attendanceStats.pending}
-                </p>
-                <p className="text-sm text-muted-foreground">Chờ xác nhận</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filter */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserCheck className="w-5 h-5" />
-            Danh sách học sinh hôm nay
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm học sinh, lớp, điểm đón..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant={attendanceFilter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setAttendanceFilter("all")}
-              >
-                Tất cả
-              </Button>
-              <Button
-                variant={attendanceFilter === "present" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setAttendanceFilter("present")}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                Có mặt
-              </Button>
-              <Button
-                variant={attendanceFilter === "absent" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setAttendanceFilter("absent")}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                Vắng mặt
-              </Button>
-              <Button
-                variant={attendanceFilter === "pending" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setAttendanceFilter("pending")}
-                className="bg-yellow-600 hover:bg-yellow-700"
-              >
-                Chờ xác nhận
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Students Table */}
-      <Card>
+      <Card className="border-none shadow-none">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Học sinh</TableHead>
                 <TableHead>Điểm đón/trả</TableHead>
-                <TableHead>Thời gian</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Thao tác</TableHead>
               </TableRow>
@@ -314,15 +221,10 @@ export default function DriverStudents({ driverId }) {
                 <TableRow key={student.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <span className="text-sm font-medium text-blue-800">
-                          {student.avatar}
-                        </span>
-                      </div>
                       <div>
                         <p className="font-medium">{student.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {student.class} • {student.school}
+                          {student.school || "Không rõ trường"}
                         </p>
                       </div>
                     </div>
@@ -331,32 +233,22 @@ export default function DriverStudents({ driverId }) {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-sm">
                         <MapPin className="w-4 h-4 text-green-600" />
-                        <span>{student.pickupLocation}</span>
+                        <span>{student.pickup_point}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <School className="w-4 h-4 text-blue-600" />
-                        <span>{student.dropoffLocation}</span>
+                        <span>{student.dropoff_point}</span>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="w-4 h-4" />
-                        <span>Đón: {student.pickupTime}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="w-4 h-4" />
-                        <span>Trả: {student.dropoffTime}</span>
-                      </div>
-                    </div>
-                  </TableCell>
+
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {getAttendanceIcon(student.attendance)}
                       {getAttendanceBadge(student.attendance)}
                     </div>
                   </TableCell>
+
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {student.attendance === "pending" && (
@@ -365,9 +257,7 @@ export default function DriverStudents({ driverId }) {
                             size="sm"
                             variant="outline"
                             className="text-green-600 hover:bg-green-50"
-                            onClick={() =>
-                              updateAttendance(student.id, "present")
-                            }
+                            onClick={() => updateAttendance(student.id, "present")}
                           >
                             <CheckCircle className="w-4 h-4 mr-1" />
                             Có mặt
@@ -376,130 +266,13 @@ export default function DriverStudents({ driverId }) {
                             size="sm"
                             variant="outline"
                             className="text-red-600 hover:bg-red-50"
-                            onClick={() =>
-                              updateAttendance(student.id, "absent")
-                            }
+                            onClick={() => updateAttendance(student.id, "absent")}
                           >
                             <XCircle className="w-4 h-4 mr-1" />
                             Vắng
                           </Button>
                         </>
                       )}
-
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelectedStudent(student)}
-                          >
-                            <Eye className="w-4 h-4 mr-1" />
-                            Chi tiết
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>Thông tin học sinh</DialogTitle>
-                            <DialogDescription>
-                              Xem thông tin chi tiết và trạng thái của học sinh
-                            </DialogDescription>
-                          </DialogHeader>
-                          {selectedStudent && (
-                            <div className="space-y-4">
-                              <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
-                                  <span className="text-lg font-medium text-blue-800">
-                                    {selectedStudent.avatar}
-                                  </span>
-                                </div>
-                                <div>
-                                  <h3 className="font-medium">
-                                    {selectedStudent.name}
-                                  </h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    {selectedStudent.class} •{" "}
-                                    {selectedStudent.school}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="space-y-3">
-                                <div>
-                                  <p className="font-medium">Phụ huynh:</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {selectedStudent.parentName}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="font-medium">Số điện thoại:</p>
-                                  <div className="flex items-center gap-2">
-                                    <p className="text-sm text-muted-foreground">
-                                      {selectedStudent.parentPhone}
-                                    </p>
-                                    <Button size="sm" variant="outline">
-                                      <Phone className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                                <div>
-                                  <p className="font-medium">Điểm đón:</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {selectedStudent.pickupLocation} (
-                                    {selectedStudent.pickupTime})
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="font-medium">Điểm trả:</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {selectedStudent.dropoffLocation} (
-                                    {selectedStudent.dropoffTime})
-                                  </p>
-                                </div>
-                                {selectedStudent.notes && (
-                                  <div>
-                                    <p className="font-medium">Ghi chú:</p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {selectedStudent.notes}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-
-                              {selectedStudent.attendance === "pending" && (
-                                <div className="flex gap-2 pt-4">
-                                  <Button
-                                    className="flex-1 bg-green-600 hover:bg-green-700"
-                                    onClick={() => {
-                                      updateAttendance(
-                                        selectedStudent.id,
-                                        "present"
-                                      );
-                                      setSelectedStudent(null);
-                                    }}
-                                  >
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Xác nhận có mặt
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    className="flex-1 text-red-600 hover:bg-red-50"
-                                    onClick={() => {
-                                      updateAttendance(
-                                        selectedStudent.id,
-                                        "absent"
-                                      );
-                                      setSelectedStudent(null);
-                                    }}
-                                  >
-                                    <XCircle className="w-4 h-4 mr-2" />
-                                    Xác nhận vắng
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </DialogContent>
-                      </Dialog>
                     </div>
                   </TableCell>
                 </TableRow>

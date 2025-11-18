@@ -168,9 +168,8 @@ io.on("connection", (socket) => {
         return;
       }
 
-      const message = `Học sinh ${student.name} đã được trả tại điểm ${
-        student.dropoff_point
-      } an toan vào lúc ${new Date().toLocaleTimeString()}.`;
+      const message = `Học sinh ${student.name} đã được trả tại điểm ${student.dropoff_point
+        } an toan vào lúc ${new Date().toLocaleTimeString()}.`;
 
       console.log(
         `Gửi thông báo đến phụ huynh (${parent.username}): ${message}`

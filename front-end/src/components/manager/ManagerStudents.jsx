@@ -446,9 +446,8 @@ export default function ManagerStudents() {
               <div>
                 <p className="text-sm text-muted-foreground">Đang học</p>
                 <p
-                  className={`${
-                    isMobile ? "text-xl" : "text-2xl"
-                  } font-bold text-green-600`}
+                  className={`${isMobile ? "text-xl" : "text-2xl"
+                    } font-bold text-green-600`}
                 >
                   {activeStudents}
                 </p>
@@ -464,9 +463,8 @@ export default function ManagerStudents() {
               <div>
                 <p className="text-sm text-muted-foreground">Tạm nghỉ</p>
                 <p
-                  className={`${
-                    isMobile ? "text-xl" : "text-2xl"
-                  } font-bold text-gray-600`}
+                  className={`${isMobile ? "text-xl" : "text-2xl"
+                    } font-bold text-gray-600`}
                 >
                   {inactiveStudents}
                 </p>
@@ -482,9 +480,8 @@ export default function ManagerStudents() {
               <div>
                 <p className="text-sm text-muted-foreground">Tỷ lệ đi học</p>
                 <p
-                  className={`${
-                    isMobile ? "text-xl" : "text-2xl"
-                  } font-bold text-blue-600`}
+                  className={`${isMobile ? "text-xl" : "text-2xl"
+                    } font-bold text-blue-600`}
                 >
                   {totalStudents > 0
                     ? Math.round((activeStudents / totalStudents) * 100)
@@ -513,15 +510,7 @@ export default function ManagerStudents() {
                 {isMobile ? "Thêm" : "Thêm học sinh"}
               </Button>
 
-              <Button variant="outline" className="gap-2">
-                <Upload className="w-4 h-4" />
-                {isMobile ? "Import" : "Import Excel"}
-              </Button>
 
-              <Button variant="outline" className="gap-2">
-                <Download className="w-4 h-4" />
-                {isMobile ? "Export" : "Export Excel"}
-              </Button>
             </div>
           </div>
         </CardHeader>

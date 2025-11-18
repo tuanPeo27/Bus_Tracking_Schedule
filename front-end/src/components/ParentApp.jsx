@@ -21,7 +21,11 @@ import { ParentTracking } from "./parent/ParentTracking";
 import { ParentNotifications } from "./parent/ParentNotifications";
 import { ParentMessages } from "./parent/ParentMessages";
 import { ChangePassword } from "./ChangePassword";
-import { getInfoParent, getInfoStudent } from "../service/parentService";
+import {
+  getInfoParent,
+  getInfoStudent,
+  getRouteByStudentId,
+} from "../service/parentService";
 
 export function ParentApp({ onBack }) {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -30,8 +34,9 @@ export function ParentApp({ onBack }) {
   const isMobile = useIsMobile();
   const [parentInfo, setParentInfo] = useState("");
   const [studentInfo, setStudentInfo] = useState("");
-  const { notificationsList = [] } = useNotifications();
-  const unreadCount = notificationsList.filter((n) => !n.isRead).length;
+  const [routeInfo, setRouteInfo] = useState("");
+  const { notifications = [] } = useNotifications();
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const handleLogout = () => {
     clearAll();
@@ -65,6 +70,29 @@ export function ParentApp({ onBack }) {
     getParent();
     getStudent();
   }, []);
+
+  useEffect(() => {
+    if (studentInfo && studentInfo.length > 0) {
+      const fetchAllRoutes = async () => {
+        try {
+          const allRoutes = await Promise.all(
+            studentInfo.map(async (student) => {
+              const res = await getRouteByStudentId(student.id);
+              if (res && res.data.EC === 0) {
+                return { studentId: student.id, route: res.data.DT };
+              }
+              return { studentId: student.id, route: [] };
+            })
+          );
+          setRouteInfo(allRoutes);
+        } catch (error) {
+          console.log("Lỗi khi lấy thông tin tuyến đường:", error);
+        }
+      };
+
+      fetchAllRoutes();
+    }
+  }, [studentInfo]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -151,14 +179,13 @@ export function ParentApp({ onBack }) {
 
               <TabsTrigger
                 value="notifications"
-                className={`${
-                  isMobile
-                    ? "flex-col gap-1 min-w-[60px] text-xs relative"
-                    : "gap-2"
+                className={`relative ${
+                  isMobile ? "flex-col gap-1 min-w-[60px] text-xs" : "gap-2"
                 }`}
               >
                 <Bell className="w-4 h-4" />
                 {isMobile ? "T.báo" : "Thông báo"}
+
                 {unreadCount > 0 && (
                   <Badge
                     className={`bg-red-500 text-white text-xs px-1.5 py-0.5 ${
@@ -203,6 +230,7 @@ export function ParentApp({ onBack }) {
             <ParentDashboard
               parentInfo={parentInfo}
               studentInfo={studentInfo}
+              routeInfo={routeInfo}
             />
           </TabsContent>
 
