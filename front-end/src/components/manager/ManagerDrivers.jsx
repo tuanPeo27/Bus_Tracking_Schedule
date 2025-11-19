@@ -599,6 +599,7 @@ export default function ManagerDrivers() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="other">Khác</SelectItem>
                     <SelectItem value="male">Nam</SelectItem>
                     <SelectItem value="female">Nữ</SelectItem>
                   </SelectContent>
