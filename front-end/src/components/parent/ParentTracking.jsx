@@ -9,7 +9,6 @@ import {
   Navigation,
   Bus,
   Clock,
-  Route,
   RefreshCw,
   Bell,
   Phone,
@@ -17,7 +16,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 
-export function ParentTracking({ children }) {
+export function ParentTracking({ studentInfo, routeInfo }) {
   const [busLocation, setBusLocation] = useState({
     lat: 10.8231,
     lng: 106.6297,
@@ -48,12 +47,19 @@ export function ParentTracking({ children }) {
     return () => clearInterval(interval);
   }, [isTracking]);
 
-  const child = children[0]; // Assuming one child for demo
+  const child = Array.isArray(children) ? children[0] : children;
+  if (!child) {
+    return (
+      <div className="text-center p-4">
+        ⚠️ Không có dữ liệu học sinh để theo dõi.
+      </div>
+    );
+  }
 
   const busInfo = {
-    vehicle: child.vehicle,
-    driver: child.driver,
-    route: child.route,
+    vehicle: child.vehicle || "51B-12345",
+    driver: child.driver || "Nguyễn Văn A",
+    route: child.route || "Tuyến 01",
     status: "on_route",
     nextStop: "Chợ Thủ Đức",
     estimatedArrival: "12 phút",
@@ -62,24 +68,9 @@ export function ParentTracking({ children }) {
   };
 
   const upcomingStops = [
-    {
-      name: "Ngã tư Hàng Xanh",
-      status: "passed",
-      time: "07:10",
-      distance: 0,
-    },
-    {
-      name: "Cầu Sài Gòn",
-      status: "current",
-      time: "07:22",
-      distance: 1.2,
-    },
-    {
-      name: "Chợ Thủ Đức",
-      status: "upcoming",
-      time: "07:35",
-      distance: 3.5,
-    },
+    { name: "Ngã tư Hàng Xanh", status: "passed", time: "07:10", distance: 0 },
+    { name: "Cầu Sài Gòn", status: "current", time: "07:22", distance: 1.2 },
+    { name: "Chợ Thủ Đức", status: "upcoming", time: "07:35", distance: 3.5 },
     {
       name: "Điểm đón con em",
       status: "upcoming",
@@ -121,11 +112,27 @@ export function ParentTracking({ children }) {
   const formatLastUpdate = (date) => {
     const now = new Date();
     const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-
     if (diff < 60) return `${diff} giây trước`;
     if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
     return `${Math.floor(diff / 3600)} giờ trước`;
   };
+
+  // ✅ Dữ liệu routes an toàn
+  const routes = [
+    {
+      id: "bus-route",
+      path: [
+        busLocation,
+        { lat: busLocation.lat + 0.005, lng: busLocation.lng + 0.005 },
+        { lat: busLocation.lat + 0.01, lng: busLocation.lng + 0.01 },
+        { lat: busLocation.lat + 0.015, lng: busLocation.lng + 0.015 },
+        { lat: busLocation.lat + 0.02, lng: busLocation.lng + 0.02 },
+      ],
+      color: "#3b82f6",
+      strokeWeight: 4,
+      title: busInfo.route,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -135,7 +142,7 @@ export function ParentTracking({ children }) {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <MapPin className="w-5 h-5" />
-              Theo dõi xe buýt - {child.name}
+              Theo dõi xe buýt - {child.name || "Học sinh"}
               {getStatusBadge(busInfo.status)}
             </CardTitle>
 
@@ -168,7 +175,7 @@ export function ParentTracking({ children }) {
         <div className="lg:col-span-2">
           <LeafletMap
             height={isMobile ? "300px" : "400px"}
-            center={busLocation}
+            center={busLocation || { lat: 10.762622, lng: 106.660172 }}
             zoom={14}
             markers={[
               {
@@ -229,104 +236,15 @@ export function ParentTracking({ children }) {
                 `,
               })),
             ]}
-            routes={[
-              {
-                id: "bus-route",
-                path: [
-                  busLocation,
-                  {
-                    lat: busLocation.lat + 0.005,
-                    lng: busLocation.lng + 0.005,
-                  },
-                  { lat: busLocation.lat + 0.01, lng: busLocation.lng + 0.01 },
-                  {
-                    lat: busLocation.lat + 0.015,
-                    lng: busLocation.lng + 0.015,
-                  },
-                  { lat: busLocation.lat + 0.02, lng: busLocation.lng + 0.02 },
-                ],
-                color: "#3b82f6",
-                strokeWeight: 4,
-                title: busInfo.route,
-              },
-            ]}
+            routes={routes}
             showTraffic={true}
             showControls={true}
           />
-
-          {/* Bus Information */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bus className="w-5 h-5" />
-                Thông tin xe buýt
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Xe:</span>
-                    <span className="font-medium">{busInfo.vehicle}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tài xế:</span>
-                    <span className="font-medium">{busInfo.driver}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tuyến:</span>
-                    <Badge variant="outline">{busInfo.route}</Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tốc độ:</span>
-                    <span className="font-medium">
-                      {Math.round(busLocation.speed)} km/h
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Học sinh trên xe:
-                    </span>
-                    <span className="font-medium">
-                      {busInfo.studentsOnBoard} em
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Khoảng cách đến con:
-                    </span>
-                    <span className="font-medium">
-                      {busInfo.distanceToChild} km
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Thời gian đến dự kiến:
-                    </span>
-                    <span className="font-medium text-blue-600">
-                      {busInfo.estimatedArrival}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Cập nhật lần cuối:
-                    </span>
-                    <span className="text-sm">
-                      {formatLastUpdate(busLocation.timestamp)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Side Panel */}
         <div className="space-y-6">
-          {/* Upcoming Stops */}
+          {/* Lộ trình */}
           <Card>
             <CardHeader>
               <CardTitle>Lộ trình</CardTitle>
@@ -368,7 +286,7 @@ export function ParentTracking({ children }) {
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
+          {/* Hành động nhanh */}
           <Card>
             <CardHeader>
               <CardTitle>Hành động nhanh</CardTitle>
@@ -388,31 +306,6 @@ export function ParentTracking({ children }) {
                 <AlertTriangle className="w-4 h-4 mr-2" />
                 Báo cáo sự cố
               </Button>
-            </CardContent>
-          </Card>
-
-          {/* Notifications Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Cài đặt thông báo</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Xe đến gần (5 phút)</span>
-                <input type="checkbox" defaultChecked className="rounded" />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Xe đã đến điểm đón</span>
-                <input type="checkbox" defaultChecked className="rounded" />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Con đã lên xe</span>
-                <input type="checkbox" defaultChecked className="rounded" />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Xe bị trễ</span>
-                <input type="checkbox" defaultChecked className="rounded" />
-              </div>
             </CardContent>
           </Card>
         </div>

@@ -6,30 +6,57 @@ import { Input } from "../ui/input";
 import { useIsMobile } from "../ui/use-mobile";
 import socket from "../../setup/socket";
 import { Bell, Bus, AlertTriangle, Clock, Info, X } from "lucide-react";
+import { useNotificationHelpers } from "../useNotificationHelpers"; // toast system
 
 export function ParentNotifications({ parentId }) {
   const isMobile = useIsMobile();
+  const { showSuccess, showError, showInfo, showWarning } =
+    useNotificationHelpers();
+
   const [notificationsList, setNotificationsList] = useState(() => {
     const saved = localStorage.getItem(`notifications_${parentId}`);
     return saved ? JSON.parse(saved) : [];
   });
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Lắng nghe realtime
   useEffect(() => {
     if (!parentId) return;
 
     socket.emit("joinParentRoom", { parentId });
 
     const handleNotification = (notification) => {
-      console.log(notification);
       const newNotification = {
         id: Date.now(),
-        title: "Thông báo mới",
-        content: notification,
+        title: notification?.title || "Thông báo mới",
+        content:
+          typeof notification === "string"
+            ? notification
+            : notification?.message || "Không có nội dung",
         timestamp: new Date(),
         isRead: false,
-        priority: "normal",
+        type: notification?.type || "info",
       };
+
+      // Hiện toast
+      switch (newNotification.type) {
+        case "success":
+        case "arrival":
+          showSuccess(newNotification.title, newNotification.content);
+          break;
+        case "warning":
+        case "schedule_change":
+          showWarning(newNotification.title, newNotification.content);
+          break;
+        case "error":
+        case "delay":
+          showError(newNotification.title, newNotification.content);
+          break;
+        default:
+          showInfo(newNotification.title, newNotification.content);
+      }
+
+      // Lưu và cập nhật list
       setNotificationsList((prev) => {
         const updated = [newNotification, ...prev];
         localStorage.setItem(
@@ -55,7 +82,14 @@ export function ParentNotifications({ parentId }) {
   };
 
   const handleMarkAllAsRead = () => {
-    setNotificationsList((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setNotificationsList((prev) => {
+      const updated = prev.map((n) => ({ ...n, isRead: true }));
+      localStorage.setItem(
+        `notifications_${parentId}`,
+        JSON.stringify(updated)
+      );
+      return updated;
+    });
   };
 
   const handleDeleteNotification = (id) => {
@@ -69,12 +103,17 @@ export function ParentNotifications({ parentId }) {
     });
   };
 
+  const handleDeleteAll = () => {
+    setNotificationsList([]);
+    localStorage.removeItem(`notifications_${parentId}`);
+  };
+
   const unreadCount = notificationsList.filter((n) => !n.isRead).length;
 
   const filteredNotifications = notificationsList.filter(
     (n) =>
-      n.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      n.content.toLowerCase().includes(searchTerm.toLowerCase())
+      n.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      n.content?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getNotificationIcon = (type) => {
@@ -115,15 +154,27 @@ export function ParentNotifications({ parentId }) {
               </Badge>
             )}
           </CardTitle>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleMarkAllAsRead}
-            disabled={unreadCount === 0}
-          >
-            Đọc tất cả
-          </Button>
+
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleMarkAllAsRead}
+              disabled={unreadCount === 0}
+            >
+              Đọc tất cả
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleDeleteAll}
+              disabled={notificationsList.length === 0}
+            >
+              Xóa tất cả
+            </Button>
+          </div>
         </CardHeader>
+
         <CardContent>
           <Input
             placeholder="Tìm kiếm thông báo..."
@@ -175,6 +226,7 @@ export function ParentNotifications({ parentId }) {
             </CardContent>
           </Card>
         ))}
+
         {filteredNotifications.length === 0 && (
           <Card className="text-center py-8">
             <Bell className="w-10 h-10 mx-auto text-gray-400 mb-2" />

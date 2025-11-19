@@ -1,4 +1,5 @@
 const Route = require("../models/route");
+const Student = require("../models/student");
 
 exports.getAllRoutes = async (req, res) => {
   try {
@@ -30,6 +31,36 @@ exports.getRouteById = async (req, res) => {
     });
   } catch (error) {
     console.error("Lỗi lấy thông tin tuyến đường:", error);
+    res.status(500).json({ EC: -1, EM: "Lỗi server.", DT: null });
+  }
+};
+
+exports.getRouteByStudentId = async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    const student = await Student.findByPk(studentId);
+    if (!student) {
+      return res
+        .status(404)
+        .json({ EC: 1, EM: "Học sinh không tồn tại.", DT: null });
+    }
+    const route = await Route.findByPk(student.route_id);
+    if (!route) {
+      return res
+        .status(404)
+        .json({
+          EC: 1,
+          EM: "Tuyến đường của học sinh không tồn tại.",
+          DT: null,
+        });
+    }
+    res.status(200).json({
+      EC: 0,
+      EM: "Lấy thông tin tuyến đường của sinh viên.",
+      DT: route,
+    });
+  } catch (error) {
+    console.error("Lỗi lấy thông tin tuyến đường của sinh viên:", error);
     res.status(500).json({ EC: -1, EM: "Lỗi server.", DT: null });
   }
 };
