@@ -21,10 +21,23 @@ import { getAllBus, getAllDriver, getAllRoute, getAllSchedule, getAllStudent, ge
 
 export default function ManagerDashboard() {
   const [allDriverInfo, setAllDriverInfo] = useState("");
+  const [allScheduleInfo, setAllScheduleInfo] = useState("");
   const [allBusInfo, setAllBusInfo] = useState("");
   const [allRouteInfo, setAllRouteInfo] = useState("");
   const [allStudentInfo, setAllStudentInfo] = useState("");
   const [upcomingSchedules, setUpcomingSchedules] = useState([]);
+
+  const getAllSchedules = async () => {
+    try {
+      const res = await getAllSchedule();
+      if (res && res.data.EC === 0) {
+        setAllScheduleInfo(res.data.DT);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách lịch trình:", error);
+      res.status(500).json({ message: "Lỗi server" });
+    }
+  };
 
   const getAllDrivers = async () => {
     try {
@@ -122,7 +135,7 @@ export default function ManagerDashboard() {
     getAllRoutes();
     getAllStudents();
     getUpcomingSchedules();
-
+    getAllSchedules();
   }, []);
 
 
@@ -191,6 +204,7 @@ export default function ManagerDashboard() {
     <div className="space-y-6">
       {/* Statistics Cards */}
       <div className="grid md:grid-cols-4 gap-4">
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -206,6 +220,8 @@ export default function ManagerDashboard() {
             </div>
           </CardContent>
         </Card>
+
+
 
         <Card>
           <CardContent className="p-4">
