@@ -15,7 +15,7 @@ import { useIsMobile } from "./ui/use-mobile";
 import { userChangePassword } from "../service/loginChange";
 import { useNotificationHelpers } from "./useNotificationHelpers";
 
-export function ChangePassword({ username, userRole }) {
+export function ChangePassword({ userRole }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -93,8 +93,9 @@ export function ChangePassword({ username, userRole }) {
         <div>
           <h2 className={isMobile ? "text-lg" : "text-2xl"}>Đổi mật khẩu</h2>
           <p
-            className={`text-muted-foreground ${isMobile ? "text-xs" : "text-sm"
-              }`}
+            className={`text-muted-foreground ${
+              isMobile ? "text-xs" : "text-sm"
+            }`}
           >
             Thay đổi mật khẩu đăng nhập của bạn
           </p>
@@ -188,12 +189,13 @@ export function ChangePassword({ username, userRole }) {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className={`${userRole === "driver"
-                  ? "bg-green-600 hover:bg-green-700"
-                  : userRole === "admin"
+                className={`${
+                  userRole === "driver"
+                    ? "bg-green-600 hover:bg-green-700"
+                    : userRole === "admin"
                     ? "bg-blue-600 hover:bg-blue-700"
                     : "bg-purple-600 hover:bg-purple-700"
-                  }`}
+                }`}
               >
                 {isLoading ? "Đang xử lý..." : "Đổi mật khẩu"}
               </Button>

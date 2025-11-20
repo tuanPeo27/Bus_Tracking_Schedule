@@ -28,7 +28,11 @@ import DriverNotifications from "./driver/DriverNotifications";
 import DriverStatus from "./driver/DriverStatus";
 import DriverStudents from "./driver/DriverStudents";
 import { ChangePassword } from "./ChangePassword";
-import { getInfoDriver, getInfoVehicle, getDriverSchedule } from "../service/driverService";
+import {
+  getInfoDriver,
+  getInfoVehicle,
+  getDriverSchedule,
+} from "../service/driverService";
 import Cookies from "js-cookie";
 
 export function DriverApp({ onBack }) {
@@ -84,7 +88,7 @@ export function DriverApp({ onBack }) {
   };
 
   const handleAcceptSchedule = (schedule) => {
-    console.log("Đã chọn lịch trình:", schedule); 
+    console.log("Đã chọn lịch trình:", schedule);
     setActiveSchedule(schedule);
     setActiveTab("students");
   };
@@ -104,25 +108,34 @@ export function DriverApp({ onBack }) {
   // Hàm hiển thị màu trạng thái
   const getStatusColor = (status) => {
     switch (status) {
-      case "active": return "bg-green-500";
-      case "break": return "bg-yellow-500";
-      case "incident": return "bg-red-500";
-      case "offline": return "bg-gray-500";
-      default: return "";
+      case "active":
+        return "bg-green-500";
+      case "break":
+        return "bg-yellow-500";
+      case "incident":
+        return "bg-red-500";
+      case "offline":
+        return "bg-gray-500";
+      default:
+        return "";
     }
   };
 
   //  Hàm hiển thị nội dung trạng thái
   const getStatusText = (status) => {
     switch (status) {
-      case "active": return "Đang hoạt động";
-      case "break": return "Nghỉ giải lao";
-      case "incident": return "Sự cố";
-      case "offline": return "Ngoại tuyến";
-      default: return "";
+      case "active":
+        return "Đang hoạt động";
+      case "break":
+        return "Nghỉ giải lao";
+      case "incident":
+        return "Sự cố";
+      case "offline":
+        return "Ngoại tuyến";
+      default:
+        return "";
     }
   };
-
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -280,10 +293,7 @@ export function DriverApp({ onBack }) {
           </AnimatedTabsContent>
 
           <AnimatedTabsContent value="password">
-            <ChangePassword
-              username={driverInfo?.username || "taixe01"}
-              userRole="driver"
-            />
+            <ChangePassword userRole={Cookies.get("user_role")} />
           </AnimatedTabsContent>
         </AnimatedTabs>
       </main>

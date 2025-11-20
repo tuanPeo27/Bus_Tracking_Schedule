@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
+import Cookies from "js-cookie";
 import {
   Table,
   TableBody,
@@ -50,13 +51,66 @@ import {
   X,
   Eye,
 } from "lucide-react";
+import { getAllBus, createBus, updateBus, deleteBus } from "../../service/adminService";
 
 export default function ManagerVehicles() {
+  const { system, showError } = useNotificationHelpers();
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [selectedBus, setSelectedBus] = useState(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [allBus, setAllBus] = useState([]);
+  const [selectedBusId, setSelectedBusId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [busesPerPage, setBusesPerPage] = useState(10);
+
+  const [newBus, setNewBus] = useState({
+    license_plate: "",
+    brand: "",
+    model: "",
+    seats: "",
+    status: "available",
+  });
+
+  const [editBus, setEditBus] = useState({
+    license_plate: "",
+    brand: "",
+    model: "",
+    seats: "",
+    status: "available",
+  });
+
+
+  const getAllBuses = async () => {
+    try {
+      const res = await getAllBus();
+      const dataBus = Array.isArray(res.data) ? res.data : res.data?.DT || [];
+      if (res?.data?.EC === 0) {
+        const getInfoBus = await Promise.all(
+          dataBus.map(async (item) => {
+            // const scheduleInfo = await getScheduleByDriverId(item.id);
+            return { ...item };
+          })
+        );
+        setAllBus(getInfoBus);
+        console.log("check bus", dataBus);
+      } else {
+        setAllBus([]);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách xe:", error);
+      setAllBus([]);
+    }
+  };
+
+  useEffect(() => {
+    getAllBuses();
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus])
+
   const [vehicles, setVehicles] = useState([
     {
       id: "XE001",
@@ -128,34 +182,21 @@ export default function ManagerVehicles() {
     },
   ]);
   // DÒNG NÀY ĐÃ ĐƯỢC SỬA: Loại bỏ cú pháp TypeScript gây lỗi "any is not defined"
-  const [selectedVehicleId, setSelectedVehicleId] = useState(null);
 
-  const [newVehicle, setNewVehicle] = useState({
-    licensePlate: "",
-    brand: "",
-    model: "",
-    seats: "",
-    status: "active",
-    condition: "good",
-  });
-  const { showSuccess, showInfo, showError } = useNotificationHelpers();
+
 
   const getStatusBadge = (status) => {
     switch (status) {
-      case "active":
+      case "in_use":
         return (
           <Badge className="bg-green-100 text-green-800">Đang hoạt động</Badge>
         );
-      case "break":
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800">Tạm dừng</Badge>
-        );
       case "maintenance":
-        return <Badge className="bg-blue-100 text-blue-800">Bảo trì</Badge>;
-      case "breakdown":
-        return <Badge className="bg-red-100 text-red-800">Hỏng hóc</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800">Bảo trì</Badge>;
+      case "inactive":
+        return <Badge className="bg-red-100 text-red-800">Không hoạt động</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800">Có thể sử dụng</Badge>;
     }
   };
 
@@ -191,111 +232,115 @@ export default function ManagerVehicles() {
     return daysUntil <= 7;
   };
 
-  const filteredVehicles = vehicles.filter(
-    (vehicle) =>
-      vehicle.licensePlate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.assignedDriver?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredBuses = allBus.filter(
+    (bus) => {
+      const matchesSearch = (bus.license_plate.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (bus.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (bus.model.toLowerCase().includes(searchTerm.toLowerCase()))
 
-  const stats = {
-    total: vehicles.length,
-    active: vehicles.filter((v) => v.status === "active").length,
-    maintenance: vehicles.filter((v) => v.status === "maintenance").length,
-    breakdown: vehicles.filter((v) => v.status === "breakdown").length,
-  };
+      const matchesStatus =
+        filterStatus === "all" || bus.status === filterStatus;
+      return matchesSearch && matchesStatus
+    });
+
+  const indexOfLastBus = currentPage * busesPerPage;
+  const indexOfFirstBus = indexOfLastBus - busesPerPage;
+  const currentBuses = filteredBuses.slice(indexOfFirstBus, indexOfLastBus);
+  const totalPages = Math.ceil(filteredBuses.length / busesPerPage);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  // const stats = {
+  //   total: vehicles.length,
+  //   active: vehicles.filter((v) => v.status === "active").length,
+  //   maintenance: vehicles.filter((v) => v.status === "maintenance").length,
+  //   breakdown: vehicles.filter((v) => v.status === "breakdown").length,
+  // };
 
   const handleEditVehicle = (vehicle) => {
-    setSelectedVehicle(vehicle);
+    setSelectedBus(vehicle);
     setIsEditDialogOpen(true);
   };
 
   const handleViewDetails = (vehicle) => {
-    setSelectedVehicle(vehicle);
+    setSelectedBus(vehicle);
     setIsDetailDialogOpen(true);
   };
 
   // CRUD Functions
-  const handleAddVehicle = () => {
+  const handleAddBus = async () => {
     if (
-      !newVehicle.licensePlate ||
-      !newVehicle.brand ||
-      !newVehicle.model ||
-      !newVehicle.seats
+      !newBus.brand ||
+      !newBus.license_plate ||
+      !newBus.model ||
+      !newBus.seats ||
+      !newBus.status
     ) {
-      showError("Lỗi", "Vui lòng điền đầy đủ thông tin!");
+      showError("Vui lòng nhập đầy đủ thông tin");
       return;
     }
+    try {
+      console.log("Creating bus:", newBus);
+      await createBus(newBus);
 
-    const vehicle = {
-      id: `XE${String(vehicles.length + 1).padStart(3, "0")}`,
-      licensePlate: newVehicle.licensePlate,
-      brand: newVehicle.brand,
-      model: newVehicle.model,
-      seats: parseInt(newVehicle.seats),
-      avgSpeed: 30,
-      status: newVehicle.status,
-      assignedDriver: null,
-      currentRoute: null,
-      fuelLevel: 100,
-      mileage: 0,
-      lastMaintenance: new Date().toISOString().split("T")[0],
-      nextMaintenance: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
-      totalTrips: 0,
-      condition: newVehicle.condition,
-    };
-
-    setVehicles((prev) => [...prev, vehicle]);
-    setNewVehicle({
-      licensePlate: "",
-      brand: "",
-      model: "",
-      seats: "",
-      status: "active",
-      condition: "good",
-    });
-    setIsAddDialogOpen(false);
-    showSuccess("Thành công", `Đã thêm xe ${vehicle.licensePlate}!`);
-  };
-
-  const handleUpdateVehicle = () => {
-    if (!selectedVehicle) return;
-
-    setVehicles((prev) =>
-      prev.map((vehicle) =>
-        vehicle.id === selectedVehicle.id ? selectedVehicle : vehicle
-      )
-    );
-
-    showSuccess(
-      "Cập nhật thành công",
-      `Thông tin xe ${selectedVehicle?.licensePlate} đã được cập nhật!`
-    );
-    setIsEditDialogOpen(false);
-    setSelectedVehicle(null);
-  };
-
-  const handleDeleteVehicle = (vehicleId) => {
-    const vehicle = vehicles.find((v) => v.id === vehicleId);
-    if (!vehicle) return;
-
-    if (confirm(`Bạn có chắc chắn muốn xóa xe ${vehicle.licensePlate}?`)) {
-      setVehicles((prev) => prev.filter((v) => v.id !== vehicleId));
-      showSuccess("Đã xóa", `Xe ${vehicle.licensePlate} đã được xóa!`);
+      system.dataCreated("Xe bus mới");
+      setIsAddDialogOpen(false);
+      setNewBus({
+        license_plate: "",
+        brand: "",
+        model: "",
+        seats: "",
+        status: "available",
+      });
+    } catch (error) {
+      const errorMessage = error.response?.data?.EM;
+      showError(errorMessage);
+      console.log("lỗi", error)
     }
+
+    await getAllBuses();
+
+  };
+  const handleUpdateBus = async () => {
+    try {
+      console.log("editbus", selectedBus)
+      await updateBus(selectedBus, selectedBus.id);
+      console.log("Updating xe bus:", selectedBus);
+      system.dataUpdated(`Xe bus ${selectedBus.id}`);
+      setIsEditDialogOpen(false);
+      setSelectedBus(null);
+    } catch (error) {
+      console.error("Lỗi khi chỉnh sửa xe bus:", error);
+      showError("Không thể chỉnh sửa xe bus. Vui lòng thử lại!");
+    }
+    await getAllBuses();
   };
 
-  const handleRowClick = (vehicleId) => {
-    setSelectedVehicleId(vehicleId);
-    setTimeout(() => setSelectedVehicleId(null), 2000); // Remove highlight after 2 seconds
+  const handleDeleteBus = (Bus) => {
+    setSelectedBus(Bus);
+    setIsDeleteDialogOpen(true);
   };
+
+  const confirmDeleteBus = async () => {
+    try {
+      await deleteBus(selectedBus.id);
+      console.log("Deleting bus:", selectedBus);
+      system.dataDeleted(`Xe bus ${selectedBus.id}`);
+      setIsDeleteDialogOpen(false);
+      setSelectedBus(null);
+    } catch (error) {
+      console.error("Lỗi khi xóa xe bus:", error);
+      showError("Không thể xóa xe bus. Vui lòng thử lại!");
+      setIsDeleteDialogOpen(false);
+      setSelectedBus(null);
+    }
+    await getAllBuses();
+  };
+
 
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid md:grid-cols-1 gap-1">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -304,49 +349,7 @@ export default function ManagerVehicles() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Tổng xe buýt</p>
-                <p className="font-semibold">{stats.total}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Đang hoạt động</p>
-                <p className="font-semibold">{stats.active}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Wrench className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Đang bảo trì</p>
-                <p className="font-semibold">{stats.maintenance}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Hỏng hóc</p>
-                <p className="font-semibold">{stats.breakdown}</p>
+                <p className="font-semibold">{allBus?.length}</p>
               </div>
             </div>
           </CardContent>
@@ -372,15 +375,32 @@ export default function ManagerVehicles() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Tìm kiếm theo biển số, hãng xe, tài xế..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Tìm kiếm theo biển số, hãng xe, tài xế..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Lọc theo trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                  <SelectItem value="available">Có thể sử dụng</SelectItem>
+                  <SelectItem value="in_use">Đang hoạt động</SelectItem>
+                  <SelectItem value="maintenance">Bảo trì</SelectItem>
+                  <SelectItem value="inactive">Không hoạt động</SelectItem>
+                </SelectContent>
+              </SelectContent>
+            </Select>
           </div>
+
         </CardContent>
       </Card>
 
@@ -390,227 +410,131 @@ export default function ManagerVehicles() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Thông tin xe</TableHead>
-                <TableHead>Phân công</TableHead>
-                <TableHead>Hiệu suất</TableHead>
-                <TableHead>Nhiên liệu</TableHead>
-                <TableHead>Bảo trì</TableHead>
-                <TableHead>Tình trạng</TableHead>
+                <TableHead>Mã xe</TableHead>
+                <TableHead>Tên xe</TableHead>
+                <TableHead>Biển số xe</TableHead>
+                <TableHead>Số chỗ</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredVehicles.map((vehicle) => (
-                <TableRow
-                  key={vehicle.id}
-                  className={`cursor-pointer transition-colors ${
-                    selectedVehicleId === vehicle.id
-                      ? "bg-blue-50 border-l-4 border-blue-500"
-                      : ""
-                  }`}
-                  onClick={() => handleRowClick(vehicle.id)}
-                >
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Bus className="w-4 h-4" />
-                        <span className="font-medium">
-                          {vehicle.licensePlate}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {vehicle.brand} {vehicle.model}
-                      </p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Users className="w-3 h-3" />
-                        <span>{vehicle.seats} chỗ</span>
-                        <Gauge className="w-3 h-3 ml-2" />
-                        <span>{vehicle.avgSpeed} km/h</span>
-                      </div>
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    {vehicle.assignedDriver && vehicle.currentRoute ? (
-                      <div className="space-y-1">
-                        <p className="font-medium">{vehicle.assignedDriver}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {vehicle.currentRoute}
+              {
+                currentBuses.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="flex flex-col items-center gap-2">
+                        <Bus className="w-8 h-8 text-muted-foreground" />
+                        <p className="text-muted-foreground">
+                          Không tìm thấy xe bus nào
                         </p>
                       </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        Chưa phân công
-                      </span>
-                    )}
-                  </TableCell>
+                    </TableCell>
+                  </TableRow>
+                ) : (
 
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="text-sm">
-                        <span className="font-medium">
-                          {vehicle.totalTrips.toLocaleString()}
-                        </span>{" "}
-                        chuyến
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {vehicle.mileage.toLocaleString()} km
-                      </div>
-                    </div>
-                  </TableCell>
+                  currentBuses).map((bus) => (
+                    <TableRow
+                      key={bus.id}
+                      className={`cursor-pointer transition-colors ${selectedBusId === bus.id
+                        ? "bg-blue-50 border-l-4 border-blue-500"
+                        : ""
+                        }`}
+                    >
 
-                  <TableCell>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Nhiên liệu</span>
-                        <span className="font-medium">
-                          {vehicle.fuelLevel}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${getFuelLevelColor(
-                            vehicle.fuelLevel
-                          )}`}
-                          style={{ width: `${vehicle.fuelLevel}%` }}
-                        />
-                      </div>
-                    </div>
-                  </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{bus?.id}</Badge>
+                      </TableCell>
 
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="w-3 h-3" />
-                        <span>
-                          Cuối:{" "}
-                          {new Date(vehicle.lastMaintenance).toLocaleDateString(
-                            "vi-VN"
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="w-3 h-3" />
-                        <span
-                          className={
-                            isMaintenanceDue(vehicle.nextMaintenance)
-                              ? "text-red-600 font-medium"
-                              : ""
-                          }
-                        >
-                          Tiếp:{" "}
-                          {new Date(vehicle.nextMaintenance).toLocaleDateString(
-                            "vi-VN"
-                          )}
-                        </span>
-                      </div>
-                      {isMaintenanceDue(vehicle.nextMaintenance) && (
-                        <div className="flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-red-500" />
-                          <span className="text-xs text-red-600">
-                            Sắp đến hạn!
-                          </span>
+                      <TableCell>
+                        <p className="font-medium">
+                          {bus?.brand} - {bus?.model}
+                        </p>
+                      </TableCell>
+
+
+                      <TableCell>
+                        <p className="font-medium">
+                          {bus?.license_plate}
+                        </p>
+                      </TableCell>
+
+                      <TableCell>
+                        <p className="font-medium">
+                          {bus?.seats}
+                        </p>
+                      </TableCell>
+
+                      <TableCell>{getStatusBadge(bus?.status)}</TableCell>
+
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditVehicle(bus);
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleDeleteBus(bus)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
-                      )}
-                    </div>
-                  </TableCell>
-
-                  <TableCell>{getConditionBadge(vehicle.condition)}</TableCell>
-
-                  <TableCell>{getStatusBadge(vehicle.status)}</TableCell>
-
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewDetails(vehicle);
-                        }}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditVehicle(vehicle);
-                        }}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteVehicle(vehicle.id);
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                      </TableCell>
+                    </TableRow>
+                  ))}
             </TableBody>
           </Table>
         </CardContent>
+
+        {/* Phân trang */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center p-4 border-t">
+
+            <div className="flex items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => paginate(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                Trước
+              </Button>
+
+              {/* Chèn khoảng trắng */}
+              <div className="w-6 shrink-0"></div>
+
+              <span className="text-sm font-medium">
+                Trang {currentPage} / {totalPages}
+              </span>
+
+              {/* Chèn khoảng trắng */}
+              <div className="w-6 shrink-0"></div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => paginate(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Sau
+              </Button>
+            </div>
+          </div>
+        )}
+
       </Card>
 
       {/* Maintenance Alerts */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5" />
-            Cảnh báo bảo trì
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {vehicles
-              .filter((v) => isMaintenanceDue(v.nextMaintenance))
-              .map((vehicle) => (
-                <div
-                  key={vehicle.id}
-                  className="flex items-center gap-4 p-4 bg-red-50 border border-red-200 rounded-lg"
-                >
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
-                  <div className="flex-1">
-                    <p className="font-medium">
-                      Xe {vehicle.licensePlate} sắp đến hạn bảo trì
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Ngày bảo trì tiếp theo:{" "}
-                      {new Date(vehicle.nextMaintenance).toLocaleDateString(
-                        "vi-VN"
-                      )}
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Lên lịch bảo trì
-                  </Button>
-                </div>
-              ))}
 
-            {vehicles.filter((v) => isMaintenanceDue(v.nextMaintenance))
-              .length === 0 && (
-              <div className="text-center py-8">
-                <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-600" />
-                <h3 className="font-medium mb-2">
-                  Tất cả xe đều trong tình trạng tốt
-                </h3>
-                <p className="text-muted-foreground">
-                  Không có xe nào cần bảo trì trong thời gian tới.
-                </p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Add Vehicle Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -626,15 +550,15 @@ export default function ManagerVehicles() {
             <div>
               <Label htmlFor="licensePlate">Biển số xe</Label>
               <Input
-                id="licensePlate"
-                value={newVehicle.licensePlate}
+                id="license_plate"
+                value={newBus.license_plate}
                 onChange={(e) =>
-                  setNewVehicle((prev) => ({
-                    ...prev,
-                    licensePlate: e.target.value,
+                  setNewBus((newBus) => ({
+                    ...newBus,
+                    license_plate: e.target.value,
                   }))
                 }
-                placeholder="VD: 29A-12345"
+                placeholder="VD: 29A12345"
               />
             </div>
 
@@ -642,9 +566,9 @@ export default function ManagerVehicles() {
               <Label htmlFor="brand">Hãng xe</Label>
               <Input
                 id="brand"
-                value={newVehicle.brand}
+                value={newBus.brand}
                 onChange={(e) =>
-                  setNewVehicle((prev) => ({ ...prev, brand: e.target.value }))
+                  setNewBus((newBus) => ({ ...newBus, brand: e.target.value }))
                 }
                 placeholder="VD: Hyundai"
               />
@@ -654,9 +578,9 @@ export default function ManagerVehicles() {
               <Label htmlFor="model">Dòng xe</Label>
               <Input
                 id="model"
-                value={newVehicle.model}
+                value={newBus.model}
                 onChange={(e) =>
-                  setNewVehicle((prev) => ({ ...prev, model: e.target.value }))
+                  setNewBus((newBus) => ({ ...newBus, model: e.target.value }))
                 }
                 placeholder="VD: Universe"
               />
@@ -667,9 +591,9 @@ export default function ManagerVehicles() {
               <Input
                 id="seats"
                 type="number"
-                value={newVehicle.seats}
+                value={newBus.seats}
                 onChange={(e) =>
-                  setNewVehicle((prev) => ({ ...prev, seats: e.target.value }))
+                  setNewBus((newBus) => ({ ...newBus, seats: e.target.value }))
                 }
                 placeholder="VD: 45"
               />
@@ -678,48 +602,30 @@ export default function ManagerVehicles() {
             <div>
               <Label htmlFor="status">Trạng thái</Label>
               <Select
-                value={newVehicle.status}
+                value={newBus.status}
                 onValueChange={(value) =>
-                  setNewVehicle((prev) => ({ ...prev, status: value }))
+                  setNewBus((newBus) => ({ ...newBus, status: value }))
                 }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Đang hoạt động</SelectItem>
-                  <SelectItem value="break">Tạm dừng</SelectItem>
+                  <SelectItem value="available">Có thể sử dụng</SelectItem>
+                  <SelectItem value="in_use">Đang hoạt động</SelectItem>
                   <SelectItem value="maintenance">Bảo trì</SelectItem>
+                  <SelectItem value="inactive">Không hoạt động</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div>
-              <Label htmlFor="condition">Tình trạng</Label>
-              <Select
-                value={newVehicle.condition}
-                onValueChange={(value) =>
-                  setNewVehicle((prev) => ({ ...prev, condition: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="excellent">Tuyệt vời</SelectItem>
-                  <SelectItem value="good">Tốt</SelectItem>
-                  <SelectItem value="fair">Khá</SelectItem>
-                  <SelectItem value="poor">Kém</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               Hủy
             </Button>
-            <Button onClick={handleAddVehicle}>
+            <Button onClick={handleAddBus}>
               <Save className="w-4 h-4 mr-2" />
               Thêm xe
             </Button>
@@ -737,17 +643,17 @@ export default function ManagerVehicles() {
             </DialogDescription>
           </DialogHeader>
 
-          {selectedVehicle && (
+          {selectedBus && (
             <div className="space-y-4">
               <div>
                 <Label htmlFor="editLicensePlate">Biển số xe</Label>
                 <Input
-                  id="editLicensePlate"
-                  value={selectedVehicle.licensePlate}
+                  id="editLicense_plate"
+                  value={selectedBus.license_plate}
                   onChange={(e) =>
-                    setSelectedVehicle((prev) => ({
-                      ...prev,
-                      licensePlate: e.target.value,
+                    setSelectedBus((editBus) => ({
+                      ...editBus,
+                      license_plate: e.target.value,
                     }))
                   }
                 />
@@ -757,10 +663,10 @@ export default function ManagerVehicles() {
                 <Label htmlFor="editBrand">Hãng xe</Label>
                 <Input
                   id="editBrand"
-                  value={selectedVehicle.brand}
+                  value={selectedBus.brand}
                   onChange={(e) =>
-                    setSelectedVehicle((prev) => ({
-                      ...prev,
+                    setSelectedBus((editBus) => ({
+                      ...editBus,
                       brand: e.target.value,
                     }))
                   }
@@ -771,10 +677,10 @@ export default function ManagerVehicles() {
                 <Label htmlFor="editModel">Dòng xe</Label>
                 <Input
                   id="editModel"
-                  value={selectedVehicle.model}
+                  value={selectedBus.model}
                   onChange={(e) =>
-                    setSelectedVehicle((prev) => ({
-                      ...prev,
+                    setSelectedBus((editBus) => ({
+                      ...editBus,
                       model: e.target.value,
                     }))
                   }
@@ -786,10 +692,10 @@ export default function ManagerVehicles() {
                 <Input
                   id="editSeats"
                   type="number"
-                  value={selectedVehicle.seats}
+                  value={selectedBus.seats}
                   onChange={(e) =>
-                    setSelectedVehicle((prev) => ({
-                      ...prev,
+                    setSelectedBus((editBus) => ({
+                      ...editBus,
                       seats: parseInt(e.target.value),
                     }))
                   }
@@ -799,46 +705,24 @@ export default function ManagerVehicles() {
               <div>
                 <Label htmlFor="editStatus">Trạng thái</Label>
                 <Select
-                  value={selectedVehicle.status}
+                  value={selectedBus.status}
                   onValueChange={(value) =>
-                    setSelectedVehicle((prev) => ({ ...prev, status: value }))
+                    setSelectedBus((editBus) => ({ ...editBus, status: value }))
                   }
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Đang hoạt động</SelectItem>
-                    <SelectItem value="break">Tạm dừng</SelectItem>
+                    <SelectItem value="available">Có thể sử dụng</SelectItem>
+                    <SelectItem value="in_use">Đang hoạt động</SelectItem>
                     <SelectItem value="maintenance">Bảo trì</SelectItem>
-                    <SelectItem value="breakdown">Hỏng hóc</SelectItem>
+                    <SelectItem value="inactive">Không hoạt động</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div>
-                <Label htmlFor="editCondition">Tình trạng</Label>
-                <Select
-                  value={selectedVehicle.condition}
-                  onValueChange={(value) =>
-                    setSelectedVehicle((prev) => ({
-                      ...prev,
-                      condition: value,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="excellent">Tuyệt vời</SelectItem>
-                    <SelectItem value="good">Tốt</SelectItem>
-                    <SelectItem value="fair">Khá</SelectItem>
-                    <SelectItem value="poor">Kém</SelectItem>
-                    <SelectItem value="maintenance">Bảo trì</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
             </div>
           )}
 
@@ -849,7 +733,7 @@ export default function ManagerVehicles() {
             >
               Hủy
             </Button>
-            <Button onClick={handleUpdateVehicle}>
+            <Button onClick={handleUpdateBus}>
               <Save className="w-4 h-4 mr-2" />
               Cập nhật
             </Button>
@@ -867,7 +751,7 @@ export default function ManagerVehicles() {
             </DialogDescription>
           </DialogHeader>
 
-          {selectedVehicle && (
+          {selectedBus && (
             <div className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
@@ -876,24 +760,24 @@ export default function ManagerVehicles() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Biển số:</span>
                       <span className="font-medium">
-                        {selectedVehicle.licensePlate}
+                        {selectedBus.licensePlate}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Hãng xe:</span>
-                      <span>{selectedVehicle.brand}</span>
+                      <span>{selectedBus.brand}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Dòng xe:</span>
-                      <span>{selectedVehicle.model}</span>
+                      <span>{selectedBus.model}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Số ghế:</span>
-                      <span>{selectedVehicle.seats}</span>
+                      <span>{selectedBus.seats}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Tốc độ TB:</span>
-                      <span>{selectedVehicle.avgSpeed} km/h</span>
+                      <span>{selectedBus.avgSpeed} km/h</span>
                     </div>
                   </div>
                 </div>
@@ -904,7 +788,7 @@ export default function ManagerVehicles() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Tài xế:</span>
                       <span>
-                        {selectedVehicle.assignedDriver || "Chưa phân công"}
+                        {selectedBus.assignedDriver || "Chưa phân công"}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -912,7 +796,7 @@ export default function ManagerVehicles() {
                         Tuyến đường:
                       </span>
                       <span>
-                        {selectedVehicle.currentRoute || "Chưa phân công"}
+                        {selectedBus.currentRoute || "Chưa phân công"}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -920,18 +804,18 @@ export default function ManagerVehicles() {
                         Tổng chuyến:
                       </span>
                       <span>
-                        {selectedVehicle.totalTrips?.toLocaleString()} chuyến
+                        {selectedBus.totalTrips?.toLocaleString()} chuyến
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Tổng km:</span>
                       <span>
-                        {selectedVehicle.mileage?.toLocaleString()} km
+                        {selectedBus.mileage?.toLocaleString()} km
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Tình trạng:</span>
-                      {getConditionBadge(selectedVehicle.condition)}
+                      {getConditionBadge(selectedBus.condition)}
                     </div>
                   </div>
                 </div>
@@ -948,14 +832,14 @@ export default function ManagerVehicles() {
                         <Gauge className="w-4 h-4" /> Mức nhiên liệu
                       </span>
                       <span className="font-semibold">
-                        {selectedVehicle.fuelLevel}%
+                        {selectedBus.fuelLevel}%
                       </span>
                     </div>
                     <Progress
-                      value={selectedVehicle.fuelLevel}
+                      value={selectedBus.fuelLevel}
                       className="h-2"
                       indicatorClassName={getFuelLevelColor(
-                        selectedVehicle.fuelLevel
+                        selectedBus.fuelLevel
                       )}
                     />
                   </div>
@@ -966,7 +850,7 @@ export default function ManagerVehicles() {
                       <span className="font-medium flex items-center gap-1">
                         <Wrench className="w-4 h-4" /> Bảo trì tiếp theo
                       </span>
-                      {isMaintenanceDue(selectedVehicle.nextMaintenance) ? (
+                      {isMaintenanceDue(selectedBus.nextMaintenance) ? (
                         <Badge variant="destructive">Sắp đến hạn</Badge>
                       ) : (
                         <Badge variant="secondary">Ổn định</Badge>
@@ -976,20 +860,20 @@ export default function ManagerVehicles() {
                       <p>
                         <span className="text-muted-foreground">Cuối:</span>{" "}
                         {new Date(
-                          selectedVehicle.lastMaintenance
+                          selectedBus.lastMaintenance
                         ).toLocaleDateString("vi-VN")}
                       </p>
                       <p>
                         <span className="text-muted-foreground">Tiếp:</span>{" "}
                         <span
                           className={
-                            isMaintenanceDue(selectedVehicle.nextMaintenance)
+                            isMaintenanceDue(selectedBus.nextMaintenance)
                               ? "text-red-600 font-medium"
                               : ""
                           }
                         >
                           {new Date(
-                            selectedVehicle.nextMaintenance
+                            selectedBus.nextMaintenance
                           ).toLocaleDateString("vi-VN")}
                         </span>
                       </p>
@@ -1010,11 +894,42 @@ export default function ManagerVehicles() {
             <Button
               onClick={() => {
                 setIsDetailDialogOpen(false);
-                handleEditVehicle(selectedVehicle);
+                handleEditVehicle(selectedBus);
               }}
             >
               <Edit className="w-4 h-4 mr-2" />
               Chỉnh sửa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác nhận xóa xe bus</DialogTitle>
+            <DialogDescription>
+              Hành động này sẽ xóa vĩnh viễn xe bus đã chọn.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Alert>
+              <AlertDescription>
+                Bạn có chắc chắn muốn xóa xe bus{" "}:
+                <strong>{selectedBus?.id}</strong>
+                Hành động này không thể hoàn tác.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteBus}>
+              Xóa
             </Button>
           </DialogFooter>
         </DialogContent>
