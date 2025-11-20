@@ -247,6 +247,7 @@ export function DriverApp({ onBack }) {
 
               <AnimatedTabsContent value="gps">
                 <DriverGPS
+                  schedule_id={activeSchedule?.id}
                   route_id={activeSchedule?.route?.id || activeSchedule?.route_id}
                   vehicle_id={currentVehicle?.id}
                 />

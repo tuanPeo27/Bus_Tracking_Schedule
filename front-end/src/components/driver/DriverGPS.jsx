@@ -5,12 +5,12 @@ import { useIsMobile } from "../ui/use-mobile";
 import { LeafletMap } from "../map/LeafletMap";
 import { useNotificationHelpers } from "../useNotificationHelpers";
 import { io } from "socket.io-client";
-import { getBusStopsByRouteId } from "../../service/driverService";
+import { getBusStopsByRouteId , editStatusBusStop , editAllStatus, getStudentsByScheduleId } from "../../service/driverService";
 import { map } from "leaflet";
 
 const GEOAPIFY_KEY = "2b833a5c3c1649d89c2e52d7976c7534";
 
-export default function DriverGPS({ route_id, vehicle_id }) {
+export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [locationError, setLocationError] = useState(null);
   const [otherBuses, setOtherBuses] = useState({});
@@ -18,11 +18,140 @@ export default function DriverGPS({ route_id, vehicle_id }) {
   const notifications = useNotificationHelpers();
 
   const [busStops, setBusStops] = useState([]);
+  const [students, setStudents] = useState([]); // mỗi phần tử có pickup_point_id, dropoff_point_id, id, name ...
+
   
   // Tách ra 2 state riêng biệt cho đường đi
   const [staticRouteCoords, setStaticRouteCoords] = useState([]); // Đường nối các trạm (Cố định)
   const [driverToFirstStopCoords, setDriverToFirstStopCoords] = useState([]); // Đường từ Tài xế -> Trạm 1 (Thay đổi)
-  
+    // Radius (meters) within which a stop is considered 'reached' and should be removed
+    const STOP_REMOVE_RADIUS = 50; // meters
+
+    // Haversine distance in meters between two lat/lng points
+    const distanceMeters = (a, b) => {
+      if (!a || !b) return Infinity;
+      const toRad = (v) => (v * Math.PI) / 180;
+      const R = 6371000; // Earth radius in meters
+      const dLat = toRad(b.lat - a.lat);
+      const dLon = toRad(b.lng - a.lng);
+      const lat1 = toRad(a.lat);
+      const lat2 = toRad(b.lat);
+      const sinDlat = Math.sin(dLat / 2);
+      const sinDlon = Math.sin(dLon / 2);
+      const h = sinDlat * sinDlat + Math.cos(lat1) * Math.cos(lat2) * sinDlon * sinDlon;
+      const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+      return R * c;
+    };
+    // Mark stops that are reached (within STOP_REMOVE_RADIUS) as visited instead of removing.
+    // We update the `status` and set a `visited` flag; route building will ignore visited stops.
+    useEffect(() => {
+      if (!currentLocation || !busStops || busStops.length === 0) return;
+      const cleanedStops = busStops.map((s) => ({ ...s, latitude: Number(s.latitude), longitude: Number(s.longitude) }));
+      const toMark = [];
+      // Only check from the start (next stops in order)
+      for (let i = 0; i < cleanedStops.length; i++) {
+        const next = cleanedStops[i];
+        if (next.visited) continue; // already visited
+        const stopPos = { lat: next.latitude, lng: next.longitude };
+        const dist = distanceMeters(currentLocation, stopPos);
+        if (dist <= STOP_REMOVE_RADIUS) {
+          toMark.push(next.id ?? i);
+        } else {
+          break;
+        }
+      }
+
+      if (toMark.length > 0) {
+        let updated = busStops.map((s, idx) => {
+          const sid = s.id ?? idx;
+          if (toMark.includes(sid)) {
+            editStatusBusStop(s.id ?? sid, "arrived");
+            return { ...s, visited: true, status: "arrived" };
+          }
+          return s;
+        });
+
+        // If after marking there are no unvisited stops left, set the last marked stop's status to 'pending'
+        const remainingAfterMark = updated.filter((s) => !s.visited);
+        if (remainingAfterMark.length === 0) {
+          const lastMarkedId = toMark[toMark.length - 1];
+          updated = updated.map((s, idx) => {
+            const sid = s.id ?? idx;
+            if (sid === lastMarkedId)
+              {
+                editAllStatus(s.route_id, "pending");
+                return { ...s, visited: true, status: "arrived" };
+              } 
+            return s;
+          });
+        }
+
+        setBusStops(updated);
+
+        // send students for each marked stop
+        for (const markedId of toMark) {
+          // Lọc list học sinh cho điểm dừng này
+          const pickupList = students.filter(s => Number(s.pickup_point_id) === Number(markedId));
+          const dropoffList = students.filter(s => Number(s.dropoff_point_id) === Number(markedId));
+
+          // Send students lists to server via socket only
+          emitStopStudents(markedId, pickupList, dropoffList);
+        }
+
+        // show notification and update server status
+        try {
+          // If this marking consumed the last unvisited stop, set that last marked stop to 'pending'
+          if (remainingAfterMark.length === 0) {
+            const lastMarkedId = toMark[toMark.length - 1];
+            const lastIdx = updated.findIndex((s, i) => (s.id ?? i) === lastMarkedId);
+            const last = lastIdx >= 0 ? updated[lastIdx] : null;
+            if (last && last.name) {
+              notifications.showInfo?.("Đã đến điểm cuối", `${last.name} — đã đến và chuyển sang trạng thái pending.`);
+              try {
+              } catch (e) {
+                console.warn("Failed to update stop status on server for final stop", e);
+              }
+            } else {
+              notifications.showInfo?.("Đã đến điểm cuối", "Điểm dừng cuối đã được đánh dấu là pending.");
+            }
+          } else {
+            const firstIdx = busStops.findIndex((s, i) => toMark.includes(s.id ?? i));
+            const first = firstIdx >= 0 ? busStops[firstIdx] : null;
+            if (first && first.name) {
+              notifications.showSuccess?.("Đã đến điểm dừng", `${first.name} — đã đến và được đánh dấu.`);
+              try {
+              } catch (e) {
+                console.warn("Failed to update stop status on server", e);
+              }
+            } else {
+              notifications.showInfo?.("Đã đến điểm dừng", "Một điểm dừng đã được đánh dấu là đã đến.");
+            }
+          }
+        } catch (err) {
+          console.warn("Notification failed:", err);
+        }
+
+        // Immediately recompute dynamic route (driver -> new first unvisited stop)
+        (async () => {
+          try {
+            const remaining = updated.filter((s) => !s.visited);
+            if (remaining.length > 0 && currentLocation) {
+              const first = { lat: Number(remaining[0].latitude), lng: Number(remaining[0].longitude) };
+              const seg2 = await fetchSegment(currentLocation, first);
+              if (seg2 && seg2.length > 0) {
+                setDriverToFirstStopCoords(seg2);
+              } else {
+                setDriverToFirstStopCoords([currentLocation, first]);
+              }
+            } else {
+              setDriverToFirstStopCoords([]);
+            }
+          } catch (e) {
+            console.warn("Failed to recompute dynamic route after stop mark", e);
+          }
+        })();
+      }
+    }, [currentLocation, busStops]);
   const [routeStatus, setRouteStatus] = useState("idle");
   
   // Cờ kiểm soát việc fetch
@@ -30,6 +159,7 @@ export default function DriverGPS({ route_id, vehicle_id }) {
   const isFetchingDynamic = useRef(false);
 
   const socket = useMemo(() => io("http://26.58.101.232:5000"), []);
+  const emitIntervalRef = useRef(null);
 
   // 1. Lấy danh sách trạm
   useEffect(() => {
@@ -40,6 +170,7 @@ export default function DriverGPS({ route_id, vehicle_id }) {
           if (res && res.data && res.data.EC === 0) {
             // Sắp xếp trạm theo thứ tự (order_index) nếu có, hoặc theo ID
             const sortedStops = res.data.DT || []; 
+            console.log("Fetched bus stops:", sortedStops);
             setBusStops(sortedStops);
           }
         } catch (err) {
@@ -49,6 +180,30 @@ export default function DriverGPS({ route_id, vehicle_id }) {
       fetchBusStops();
     }
   }, [route_id]);
+
+  // 1b. Lấy danh sách học sinh cho lịch trình (nếu có)
+  useEffect(() => {
+    const fetchStudents = async (sid) => {
+      if (!sid) return;
+      try {
+        const res = await getStudentsByScheduleId(sid);
+        if (res && res.data && res.data.EC === 0) {
+          const dt = res.data.DT || {};
+          const studentsFromApi = Array.isArray(dt.students) ? dt.students : [];
+          // mark default attendance/payload field if needed
+          const enriched = studentsFromApi.map((s) => ({ ...s }));
+          setStudents(enriched);
+          console.log("Loaded students for schedule:", sid, enriched.length);
+        } else {
+          console.warn("No students returned for schedule", sid, res?.data?.EM);
+        }
+      } catch (err) {
+        console.error("Failed to fetch students for schedule", sid, err);
+      }
+    };
+
+    if (schedule_id) fetchStudents(schedule_id);
+  }, [schedule_id]);
 
   // 2. Xử lý Socket và GPS
   useEffect(() => {
@@ -63,6 +218,15 @@ export default function DriverGPS({ route_id, vehicle_id }) {
         setOtherBuses((prev) => ({ ...prev, [data.bus_id]: { lat: data.latitude, lng: data.longitude } }));
       }
     });
+    socket.on("connect", () => {
+      console.log("Socket connected", socket.id);
+    });
+    socket.on("disconnect", (reason) => {
+      console.log("Socket disconnected", reason);
+    });
+    socket.on("connect_error", (err) => {
+      console.warn("Socket connect_error", err);
+    });
 
     //TODO: Tao sua ne
     setCurrentLocation({lat: 10.8231, lng: 106.6297})
@@ -74,7 +238,7 @@ export default function DriverGPS({ route_id, vehicle_id }) {
         //TODO: Tao sua ne
         // setCurrentLocation({ lat: latitude, lng: longitude });
 
-        socket.emit("bus_location_update", { bus_id: vehicle_id, latitude, longitude });
+        socket.emit("bus-location", { busId:1, latitude, longitude });
       },
       (error) => {
         setLocationError(error.message);
@@ -87,6 +251,52 @@ export default function DriverGPS({ route_id, vehicle_id }) {
       socket.off("bus_location_broadcast");
     };
   }, [vehicle_id, socket]);
+
+  // Emit current location to the server every 3 seconds while we have a location
+  useEffect(() => {
+    // clear any existing interval
+    if (emitIntervalRef.current) {
+      clearInterval(emitIntervalRef.current);
+      emitIntervalRef.current = null;
+    }
+
+    if (!socket || !currentLocation) return;
+
+    // Emit immediately once
+    try {
+      socket.emit("bus_location_update", {
+        bus_id: vehicle_id,
+        latitude: currentLocation.lat,
+        longitude: currentLocation.lng,
+      });
+    } catch (e) {
+      console.warn("Failed to emit initial location:", e);
+    }
+
+    // Then emit every 3 seconds
+    emitIntervalRef.current = setInterval(() => {
+      try {
+        const loc = currentLocation; // use latest from closure
+        if (loc) {
+          socket.emit("bus-location", {
+            busId: 1,
+            latitude: loc.lat,
+            longitude: loc.lng,
+            sentAt: Date.now(),
+          });
+        }
+      } catch (e) {
+        console.warn("Periodic emit failed:", e);
+      }
+    }, 3000);
+
+    return () => {
+      if (emitIntervalRef.current) {
+        clearInterval(emitIntervalRef.current);
+        emitIntervalRef.current = null;
+      }
+    };
+  }, [socket, currentLocation, vehicle_id]);
 
   // --- Helper Functions ---
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -132,30 +342,39 @@ export default function DriverGPS({ route_id, vehicle_id }) {
   useEffect(() => {
     const buildStaticRoute = async () => {
       if (!busStops || busStops.length < 2 || isFetchingStatic.current) return;
-      if (staticRouteCoords.length > 0) return; // Đã có đường rồi thì thôi
+
+      // Clear previous static route so we rebuild according to latest stops
+      setStaticRouteCoords([]);
 
       isFetchingStatic.current = true;
       setRouteStatus("Đang vẽ tuyến đường cố định...");
-      
+
       let allCoords = [];
-      const stops = busStops.map(s => ({ lat: Number(s.latitude), lng: Number(s.longitude) }));
+      // Only include unvisited stops when building the static route
+      const unvisited = (busStops || []).filter((s) => !s.visited);
+      if (unvisited.length < 2) {
+        setStaticRouteCoords([]);
+        isFetchingStatic.current = false;
+        setRouteStatus("Đã tải xong tuyến đường.");
+        return;
+      }
+      const stops = unvisited.map((s) => ({ lat: Number(s.latitude), lng: Number(s.longitude) }));
 
       for (let i = 0; i < stops.length - 1; i++) {
         // Delay nhỏ để tránh spam API
-        await sleep(200); 
+        await sleep(200);
         const seg = await fetchSegment(stops[i], stops[i + 1]);
-        
+
         if (seg.length > 0) {
-          
           // Nối mảng, tránh trùng điểm nối
           if (allCoords.length > 0) {
             allCoords = [...allCoords, ...seg.slice(1)];
-            } else {
-                 allCoords = [...seg];
-            }
+          } else {
+            allCoords = [...seg];
+          }
         } else {
-            // Fallback đường thẳng nếu API lỗi
-            allCoords.push(stops[i], stops[i+1]);
+          // Fallback đường thẳng nếu API lỗi
+          allCoords.push(stops[i], stops[i + 1]);
         }
       }
 
@@ -178,9 +397,17 @@ export default function DriverGPS({ route_id, vehicle_id }) {
       // Ở đây ta fetch đơn giản
       isFetchingDynamic.current = true;
 
-      const firstStop = { lat: Number(busStops[0].latitude), lng: Number(busStops[0].longitude) };
-      
-      // Fetch đoạn đường từ Tài xế -> Trạm 1
+      // Find the first unvisited stop
+      const nextUnvisited = (busStops || []).find((s) => !s.visited);
+      if (!nextUnvisited) {
+        setDriverToFirstStopCoords([]);
+        isFetchingDynamic.current = false;
+        return;
+      }
+
+      const firstStop = { lat: Number(nextUnvisited.latitude), lng: Number(nextUnvisited.longitude) };
+
+      // Fetch đoạn đường từ Tài xế -> Trạm 1 (first unvisited)
       const seg = await fetchSegment(currentLocation, firstStop);
       
       if (seg.length > 0) {
@@ -257,6 +484,34 @@ export default function DriverGPS({ route_id, vehicle_id }) {
   ];
 }, [currentLocation, busStops, otherBuses]);
 
+// Hoặc gửi qua socket
+const emitStopStudents = (stopId, pickupList, dropoffList) => {
+  try {
+    if ((!Array.isArray(pickupList) || pickupList.length === 0) && (!Array.isArray(dropoffList) || dropoffList.length === 0)) {
+      console.log("No pickup/dropoff students for stop", stopId, "— skipping emit");
+      return;
+    }
+
+    if (!Array.isArray(students) || students.length === 0) {
+      console.warn("No students loaded in state — emitted lists may be incomplete");
+    }
+
+    // include acknowledgement callback so we know server received or errored
+    socket.emit("student-dropoff", { stopId, dropoff: dropoffList }, (ack) => {
+      console.log("stop_students ack for", stopId, ack);
+    });
+
+    socket.emit("student-pickup", { stopId, pickup: pickupList }, (ack) => {
+      console.log("stop_students ack for", stopId, ack);  
+    });
+
+
+    console.log("Emitted stop_students for stopId:", stopId, { pickupCount: pickupList.length, dropoffCount: dropoffList.length });
+  } catch (err) {
+    console.warn("Failed to emit stop_students", err);
+  }
+};
+
   return (
     <div className="space-y-6">
       <div className={`grid ${isMobile ? "grid-cols-1" : "lg:grid-cols-3"} gap-6`}>
@@ -297,14 +552,14 @@ export default function DriverGPS({ route_id, vehicle_id }) {
                 busStops.map((stop, index) => (
                   <div key={stop.id || index} className="relative pl-6 pb-6 last:pb-0 border-l-2 border-gray-200 last:border-l-0 ml-2">
                     {/* Đường nối dọc (timeline) */}
-                    <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 ${index === 0 ? 'border-blue-500 bg-white' : 'border-green-500 bg-green-500'}`}></div>
+                    <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 ${stop.visited ? 'border-gray-400 bg-gray-400' : (index === 0 ? 'border-blue-500 bg-white' : 'border-green-500 bg-green-500')}`}></div>
                     
                     <div className="bg-white p-3 rounded-lg border shadow-sm -mt-1 ml-2">
                         <div className="flex justify-between items-start">
                             <p className="font-semibold text-sm text-gray-800">Trạm {index + 1}: {stop.name}</p>
                             <Badge variant="outline" className="text-[10px]">Điểm dừng</Badge>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1 truncate">{stop.address || "Đang cập nhật địa chỉ"}</p>
+                        <p className="text-xs text-gray-500 mt-1 truncate">{stop.status}</p>
                     </div>
                   </div>
                 ))
