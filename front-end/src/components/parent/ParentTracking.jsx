@@ -22,7 +22,6 @@ export function ParentTracking({ studentInfo, routeInfo }) {
     : routeInfo
     ? [routeInfo]
     : [];
-  console.log(studentInfo);
   // Lấy danh sách ID
   const routeIds = routes.map((r) => r.route?.id);
   const studentIds = students.map((s) => s.id);
@@ -77,6 +76,19 @@ export function ParentTracking({ studentInfo, routeInfo }) {
     fetchStops();
   }, [routeIds]);
 
+  //----UPDATE CURRENT LOCATION----
+  useEffect(() => {
+    socket.on("bus-location-update", async (data) => {
+      try {
+        setCurrentLocation({
+          lat: data.latitude,
+          lng: data.longitude,
+        });
+      } catch (error) {
+        console.log(error);
+      }
+    });
+  });
   // ---- GEOAPIFY FETCH ----
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -300,10 +312,11 @@ export function ParentTracking({ studentInfo, routeInfo }) {
                     </p>
                     <div className="flex justify-between text-sm text-gray-700">
                       <span>
-                        Điểm đón: {student.pickup_point || "Đang cập nhật"}
+                        Điểm đón: {student.pickup_point.name || "Đang cập nhật"}
                       </span>
                       <span>
-                        Điểm trả: {student.dropoff_point || "Đang cập nhật"}
+                        Điểm trả:{" "}
+                        {student.dropoff_point.name || "Đang cập nhật"}
                       </span>
                     </div>
                   </div>
