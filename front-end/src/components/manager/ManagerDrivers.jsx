@@ -104,64 +104,7 @@ export default function ManagerDrivers() {
     setCurrentPage(1);
   }, [searchTerm])
 
-  const drivers = [
-    {
-      id: "TX001",
-      name: "Nguyễn Văn Minh",
-      birthDate: "1985-03-15",
-      gender: "Nam",
-      licenseNumber: "B2-123456789",
-      phone: "0912345678",
-      status: "active",
-      currentVehicle: "29A-12345",
-      currentRoute: "Tuyến 1",
-      totalTrips: 245,
-      onTimeRate: 96.5,
-      lastActive: new Date(Date.now() - 30 * 60 * 1000),
-    },
-    {
-      id: "TX002",
-      name: "Trần Văn Hùng",
-      birthDate: "1990-08-22",
-      gender: "Nam",
-      licenseNumber: "B2-987654321",
-      phone: "0987654321",
-      status: "active",
-      currentVehicle: "29A-67890",
-      currentRoute: "Tuyến 2",
-      totalTrips: 189,
-      onTimeRate: 94.2,
-      lastActive: new Date(Date.now() - 15 * 60 * 1000),
-    },
-    {
-      id: "TX003",
-      name: "Lê Thị Lan",
-      birthDate: "1988-12-10",
-      gender: "Nữ",
-      licenseNumber: "B2-456789123",
-      phone: "0923456789",
-      status: "break",
-      currentVehicle: "29A-11111",
-      currentRoute: "Tuyến 3",
-      totalTrips: 312,
-      onTimeRate: 98.1,
-      lastActive: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    },
-    {
-      id: "TX004",
-      name: "Phạm Văn Đức",
-      birthDate: "1982-05-18",
-      gender: "Nam",
-      licenseNumber: "B2-789123456",
-      phone: "0934567890",
-      status: "offline",
-      currentVehicle: null,
-      currentRoute: null,
-      totalTrips: 428,
-      onTimeRate: 92.7,
-      lastActive: new Date(Date.now() - 8 * 60 * 60 * 1000),
-    },
-  ];
+
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -182,16 +125,6 @@ export default function ManagerDrivers() {
     }
   };
 
-
-  const formatLastActive = (date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-
-    if (minutes < 60) return `${minutes} phút trước`;
-    return `${hours} giờ trước`;
-  };
 
   const filteredDrivers = allDriver.filter((driver) => {
     const matchesSearch =
@@ -269,73 +202,6 @@ export default function ManagerDrivers() {
     }
     await getAllDrivers();
   };
-
-  // const handleSaveNewDriver = () => {
-  //   if (!newDriver.name || !newDriver.licenseNumber || !newDriver.phone) {
-  //     showError("Vui lòng điền đầy đủ thông tin bắt buộc");
-  //     return;
-  //   }
-
-  //   // Kiểm tra trùng lặp giấy phép lái xe
-  //   const existingDriver = drivers.find(
-  //     (d) => d.licenseNumber === newDriver.licenseNumber
-  //   );
-  //   if (existingDriver) {
-  //     showError("Số giấy phép lái xe đã tồn tại trong hệ thống");
-  //     return;
-  //   }
-
-  //   // Kiểm tra trùng lặp số điện thoại
-  //   const existingPhone = drivers.find((d) => d.phone === newDriver.phone);
-  //   if (existingPhone) {
-  //     showError("Số điện thoại đã được sử dụng bởi tài xế khác");
-  //     return;
-  //   }
-
-  //   // Tạo tài xế mới
-  //   const driverData = {
-  //     ...newDriver,
-  //     id: `TX${String(drivers.length + 1).padStart(3, "0")}`,
-  //     status: "offline",
-  //     currentVehicle: null,
-  //     currentRoute: null,
-  //     totalTrips: 0,
-  //     onTimeRate: 0,
-  //     lastActive: new Date(),
-  //   };
-
-  //   // Trong ứng dụng thực, sẽ gọi API để lưu vào database
-  //   console.log("Thêm tài xế mới:", driverData);
-
-  //   showSuccess(`Đã thêm tài xế ${newDriver.name} thành công`);
-  //   setIsAddDialogOpen(false);
-  //   setNewDriver({
-  //     name: "",
-  //     birthDate: "",
-  //     gender: "Nam",
-  //     licenseNumber: "",
-  //     phone: "",
-  //   });
-  // };
-
-  // const handleDeleteDriver = (driverId) => {
-  //   const driver = drivers.find((d) => d.id === driverId);
-  //   if (driver) {
-  //     // Kiểm tra nếu tài xế đang hoạt động
-  //     if (driver.status === "active") {
-  //       showError(
-  //         "Không thể xóa tài xế đang hoạt động. Vui lòng chuyển tài xế về trạng thái offline trước"
-  //       );
-  //       return;
-  //     }
-
-  //     // Trong ứng dụng thực, sẽ gọi API để xóa
-  //     console.log("Xóa tài xế:", driverId);
-  //     showInfo(`Đã xóa tài xế ${driver.name}`);
-  //   }
-  // };
-
-
 
   const handleUpdateDriver = async () => {
     try {
