@@ -11,5 +11,8 @@ const getInfoStudent = async (idUser) => {
 const getRouteByStudentId = async (idStudent) => {
     return instance.get(`routes/student/${idStudent}`);
 };
+const getStudentCurrentLocation = async (studentId) => {
+    return instance.get();
+};
 
-export { getInfoParent, getInfoStudent, getRouteByStudentId };
+export { getInfoParent, getInfoStudent, getRouteByStudentId, getStudentCurrentLocation };
