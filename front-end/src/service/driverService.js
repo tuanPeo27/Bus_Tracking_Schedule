@@ -31,6 +31,13 @@ const getBusStopsByRouteId = async (route_id) => {
   return instance.get(`/busstops/route/${route_id}`);
 };
 
+const editStatusBusStop = async (busStopId, status) => {
+    return instance.put(`/busstops/status/${busStopId}`, { status });
+};
+
+const editAllStatus = async (route_id, status) => {
+    return instance.put(`/busstops/status/all/${route_id}`, { status });
+};
 
 export {
   getInfoDriver,
@@ -40,4 +47,6 @@ export {
   getStudentsByScheduleId,
   getDriverGPS,
   getBusStopsByRouteId,
+  editStatusBusStop,
+  editAllStatus,
 };
