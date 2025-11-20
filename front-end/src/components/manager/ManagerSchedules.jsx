@@ -44,7 +44,7 @@ import {
   Bus,
   User,
 } from "lucide-react";
-import { createSchedule, deleteSchedule, getAllSchedule, getInfoBus, getInfoDriver, getInfoRoute, getInfoStudentByRouteId, updateSchedule } from "../../service/adminService";
+import { createSchedule, deleteSchedule, getAllBus, getAllDriver, getAllRoute, getAllSchedule, getInfoBus, getInfoDriver, getInfoRoute, getInfoStudentByRouteId, updateSchedule } from "../../service/adminService";
 
 export default function ManagerSchedules() {
   const { system, showError } = useNotificationHelpers();
@@ -56,26 +56,14 @@ export default function ManagerSchedules() {
   const { showSuccess, showInfo } = useNotificationHelpers();
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [allSchedule, setAllSchedule] = useState([]);
+  const [listRoute, setListRoute] = useState([]);
+  const [listDriver, setListDriver] = useState([]);
+  const [listBus, setListBus] = useState([]);
+  const [filterRoute, setFilterRoute] = useState("all");
+  const [filterDriver, setFilterDriver] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [schedulesPerPage, setSchedulesPerPage] = useState(10);
 
-  const refershAllSchedules = async () => {
-    try {
-      const res = await getAllSchedule();
-      setSchedulesState(res.data);
-    } catch (error) {
-      console.error("Lấy lịch trình thất bại:", error);
-      setAllSchedule([]);
-    }
-  };
-
-  const setSchedulesState = (res) => {
-    if (!res?.data) return setAllSchedule([]);
-
-    if (Array.isArray(res.data)) return setAllSchedule(res.data);
-
-    if (Array.isArray(res.data?.DT)) return setAllSchedule(res.data.DT);
-
-    setAllSchedule([]);
-  };
 
 
   const getAllSchedules = async () => {
@@ -94,6 +82,7 @@ export default function ManagerSchedules() {
           })
         );
         setAllSchedule(infoSchedule);
+        console.log(infoSchedule);
       } else {
         setAllSchedule([]);
       }
@@ -105,30 +94,56 @@ export default function ManagerSchedules() {
   };
 
 
-  const listRoute = Array.from(
-    new Map(
-      (allSchedule || []).map((s) => [s?.routeInfo?.data?.DT?.id, s?.routeInfo?.data?.DT])
-    ).values()
-  );
+  const fetchRoutes = async () => {
+    try {
+      const res = await getAllRoute();
+      const data = res?.data;
+      if (data && data.EC === 0 && Array.isArray(data.DT)) {
+        setListRoute(data.DT);
+      } else {
+        console.error("Lỗi khi lấy dữ liệu tuyến đường:", errorMessage);
+      }
+    } catch (error) {
+      console.error("Lỗi mạng khi lấy tuyến đường:", error.message);
+    }
+  };
 
-  const listDriver = Array.from(
-    new Map(
-      (allSchedule || []).map((s) => [s?.driverInfo?.data?.DT?.id, s?.driverInfo?.data?.DT])
-    ).values()
-  );
+  const fetchDrivers = async () => {
+    try {
+      const res = await getAllDriver();
+      const data = res?.data;
+      if (data && data.EC === 0 && Array.isArray(data.DT)) {
+        setListDriver(data.DT);
+      } else {
+        console.error("Lỗi khi lấy dữ liệu tài xế:", errorMessage);
+      }
+    } catch (error) {
+      console.error("Lỗi mạng khi lấy tài xế:", error.message);
+    }
+  };
 
-  const listBus = Array.from(
-    new Map(
-      (allSchedule || []).map((s) => [s?.busInfo?.data?.DT?.id, s?.busInfo?.data?.DT])
-    ).values()
-  );
+  const fetchBuses = async () => {
+    try {
+      const res = await getAllBus();
+      const data = res?.data;
+      if (data && data.EC === 0 && Array.isArray(data.DT)) {
+        setListBus(data.DT);
+      } else {
+        console.error("Lỗi khi lấy dữ liệu xe bus:", errorMessage);
+      }
+    } catch (error) {
+      console.error("Lỗi mạng khi lấy xe bus:", error.message);
+    }
+  };
 
 
   useEffect(() => {
     getAllSchedules();
-
-
-  }, []);
+    fetchRoutes();
+    fetchBuses();
+    fetchDrivers();
+    setCurrentPage(1);
+  }, [searchTerm, filterRoute, filterDriver, filterStatus]);
   const [newSchedule, setNewSchedule] = useState({
     id: "",
     bus_id: "",
@@ -137,7 +152,7 @@ export default function ManagerSchedules() {
     start_time: "",
     end_time: "",
     date: "",
-    status: "",
+    status: "scheduled",
 
   });
 
@@ -152,91 +167,6 @@ export default function ManagerSchedules() {
     status: "",
   });
 
-
-
-  const schedules = [
-    {
-      id: "LT001",
-      date: "2024-12-19",
-      startTime: "07:00",
-      endTime: "17:00",
-      route: "Tuyến 1: Bến xe Miền Đông - Trường THPT Nguyễn Du",
-      driver: "Nguyễn Văn Minh",
-      vehicle: "29A-12345",
-      status: "active",
-      studentsCount: 42,
-    },
-    {
-      id: "LT002",
-      date: "2024-12-20",
-      startTime: "06:30",
-      endTime: "16:30",
-      route: "Tuyến 2: Bến xe An Sương - Trường THCS Lê Quý Đôn",
-      driver: "Trần Văn Hùng",
-      vehicle: "29A-67890",
-      status: "scheduled",
-      studentsCount: 38,
-    },
-    {
-      id: "LT003",
-      date: "2024-12-21",
-      startTime: "07:15",
-      endTime: "17:15",
-      route: "Tuyến 3: Chợ Bình Tây - Trường THPT Marie Curie",
-      driver: "Lê Thị Lan",
-      vehicle: "29A-11111",
-      status: "scheduled",
-      studentsCount: 45,
-    },
-    {
-      id: "LT004",
-      date: "2024-12-18",
-      startTime: "07:00",
-      endTime: "17:00",
-      route: "Tuyến 1: Bến xe Miền Đông - Trường THPT Nguyễn Du",
-      driver: "Nguyễn Văn Minh",
-      vehicle: "29A-12345",
-      status: "completed",
-      studentsCount: 40,
-    },
-  ];
-
-  const routes = [
-    { id: "R001", name: "Tuyến 1: Bến xe Miền Đông - Trường THPT Nguyễn Du" },
-    { id: "R002", name: "Tuyến 2: Bến xe An Sương - Trường THCS Lê Quý Đôn" },
-    { id: "R003", name: "Tuyến 3: Chợ Bình Tây - Trường THPT Marie Curie" },
-  ];
-
-  const drivers = [
-    { id: "TX001", name: "Nguyễn Văn Minh" },
-    { id: "TX002", name: "Trần Văn Hùng" },
-    { id: "TX003", name: "Lê Thị Lan" },
-    { id: "TX004", name: "Phạm Văn Đức" },
-  ];
-
-  const vehicles = [
-    { id: "XE001", plate: "29A-12345", brand: "Hyundai Universe" },
-    { id: "XE002", plate: "29A-67890", brand: "Thaco Universe" },
-    { id: "XE003", plate: "29A-11111", brand: "Hyundai County" },
-  ];
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case "active":
-        return (
-          <Badge className="bg-green-100 text-green-800">Đang thực hiện</Badge>
-        );
-      case "scheduled":
-        return <Badge className="bg-blue-100 text-blue-800">Đã lên lịch</Badge>;
-      case "completed":
-        return <Badge className="bg-gray-100 text-gray-800">Hoàn thành</Badge>;
-      case "cancelled":
-        return <Badge className="bg-red-100 text-red-800">Đã hủy</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
   const filteredSchedules = allSchedule.filter((schedule) => {
     const matchesSearch =
       (schedule.routeInfo?.data?.DT?.name.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
@@ -246,8 +176,22 @@ export default function ManagerSchedules() {
       (schedule.busInfo?.data?.DT?.brand.includes(searchTerm.toLowerCase()) ?? false) ||
       (schedule.busInfo?.data?.DT?.model.includes(searchTerm.toLowerCase()) ?? false);
 
-    return matchesSearch;
+    const matchesDriver =
+      filterDriver === "all" || schedule.driver_id === filterDriver;
+    const matchesRoute =
+      filterRoute === "all" || schedule.route_id === filterRoute;
+    const matchesStatus =
+      filterStatus === "all" || schedule.status === filterStatus;
+
+    return matchesSearch && matchesDriver && matchesRoute && matchesStatus;
   });
+
+  const indexOfLastSchedule = currentPage * schedulesPerPage;
+  const indexOfFirstSchedule = indexOfLastSchedule - schedulesPerPage;
+  const currentSchedules = filteredSchedules.slice(indexOfFirstSchedule, indexOfLastSchedule);
+  const totalPages = Math.ceil(filteredSchedules.length / schedulesPerPage);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const handleCreateSchedule = async () => {
     if (
@@ -331,6 +275,21 @@ export default function ManagerSchedules() {
     await getAllSchedules();
   };
 
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case "in_progress":
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800">Đang tiến hành</Badge>
+        );
+      case "completed":
+        return <Badge className="bg-green-100 text-green-800">Hoàn thành</Badge>;
+      case "cancelled":
+        return <Badge className="bg-red-100 text-red-800">Không hoạt động</Badge>;
+      default:
+        return <Badge className="bg-blue-100 text-blue-800">Lên lịch</Badge>;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -348,7 +307,7 @@ export default function ManagerSchedules() {
             >
               <DialogTrigger asChild>
                 <Button className="bg-blue-600 hover:bg-blue-700">
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Calendar className="w-4 h-4 mr-2" />
                   Tạo lịch trình mới
                 </Button>
               </DialogTrigger>
@@ -423,6 +382,7 @@ export default function ManagerSchedules() {
                         </SelectContent>
                       </Select>
                     </div>
+
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -466,8 +426,27 @@ export default function ManagerSchedules() {
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
 
+                  </div>
+                  <div className="space-y-2">
+                    <Label >Trạng thái</Label>
+                    <Select
+                      value={newSchedule.status}
+                      onValueChange={(value) =>
+                        setNewSchedule({ ...newSchedule, status: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn trạng thái" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="scheduled">Lên lịch</SelectItem>
+                        <SelectItem value="in_progress">Đang tiến hành</SelectItem>
+                        <SelectItem value="completed">Hoàn thành</SelectItem>
+                        <SelectItem value="cancelled">Đã hủy</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="flex gap-2 pt-4">
                     <Button onClick={handleCreateSchedule} className="flex-1">
                       Tạo lịch trình
@@ -485,9 +464,9 @@ export default function ManagerSchedules() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Tìm kiếm theo tuyến đường, tài xế, xe..."
                 value={searchTerm}
@@ -495,7 +474,50 @@ export default function ManagerSchedules() {
                 className="pl-10"
               />
             </div>
+            <div className="relative flex-1">
+              <Select value={filterRoute} onValueChange={setFilterRoute}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Lọc theo tuyến" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả tuyến</SelectItem>
+                  {listRoute.map((route) => (
+                    <SelectItem key={route.id} value={route.id}>
+                      {route.name}: {route.start_point} - {route.end_point}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Select value={filterDriver} onValueChange={setFilterDriver}>
+              <SelectTrigger>
+                <SelectValue placeholder="Lọc theo tài xế" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả tài xế</SelectItem>
+                {listDriver.map((driver) => (
+                  <SelectItem key={driver.id} value={driver.id}>
+                    {driver.username}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Lọc theo trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+
+                <SelectContent>
+                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                  <SelectItem value="cancelled">Đã hủy</SelectItem>
+                  <SelectItem value="completed">Hoàn thành</SelectItem>
+                  <SelectItem value="in_progress">Đang tiến hành</SelectItem>
+                  <SelectItem value="scheduled">Lên lịch</SelectItem>
+                </SelectContent>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -516,73 +538,122 @@ export default function ManagerSchedules() {
                 <TableHead>Thao tác</TableHead>
               </TableRow>
             </TableHeader>
+
             <TableBody>
-              {(filteredSchedules.length > 0 ? filteredSchedules : allSchedule).map((schedule) => (
-                <TableRow key={schedule.id}>
-                  <TableCell>
-                    <Badge variant="outline">{schedule.id}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        {new Date(schedule.date).toLocaleDateString("vi-VN")}
+              {
+                currentSchedules.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="flex flex-col items-center gap-2">
+                        <Calendar className="w-8 h-8 text-muted-foreground" />
+                        <p className="text-muted-foreground">
+                          Không tìm thấy lịch trình nào
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="w-3 h-3" />
-                        {schedule.start_time} - {schedule.end_time}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="max-w-xs">
-                      <p className="truncate font-medium">
-                        {schedule.routeInfo?.data?.DT?.name}: {schedule.routeInfo?.data?.DT?.start_point} - {schedule.routeInfo?.data?.DT?.end_point}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      {schedule.driverInfo?.data?.DT?.username}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Bus className="w-4 h-4" />
-                      {schedule.busInfo?.data?.DT?.brand}-{schedule.busInfo?.data?.DT?.model}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {schedule.studentInfo?.data?.DT["length"]} HS
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{schedule.status}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditSchedule(schedule)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-red-600 hover:text-red-700"
-                        onClick={() => handleDeleteSchedule(schedule)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                  </TableRow>
+                ) :
+                  (currentSchedules.length > 0 ? currentSchedules : allSchedule).map((schedule) => (
+                    <TableRow key={schedule.id}>
+                      <TableCell>
+                        <Badge variant="outline">{schedule.id}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            {new Date(schedule.date).toLocaleDateString("vi-VN")}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Clock className="w-3 h-3" />
+                            {schedule.start_time} - {schedule.end_time}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="max-w-xs">
+                          <p className="truncate font-medium">
+                            {schedule.routeInfo?.data?.DT?.name}: {schedule.routeInfo?.data?.DT?.start_point} - {schedule.routeInfo?.data?.DT?.end_point}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          {schedule.driverInfo?.data?.DT?.username}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Bus className="w-4 h-4" />
+                          {schedule.busInfo?.data?.DT?.brand}-{schedule.busInfo?.data?.DT?.model}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {schedule.studentInfo?.data?.DT["length"]} HS
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(schedule?.status)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditSchedule(schedule)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleDeleteSchedule(schedule)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
             </TableBody>
           </Table>
         </CardContent>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center p-4 border-t">
+
+            <div className="flex items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => paginate(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                Trước
+              </Button>
+
+              {/* Chèn khoảng trắng */}
+              <div className="w-6 shrink-0"></div>
+
+              <span className="text-sm font-medium">
+                Trang {currentPage} / {totalPages}
+              </span>
+
+              {/* Chèn khoảng trắng */}
+              <div className="w-6 shrink-0"></div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => paginate(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Sau
+              </Button>
+            </div>
+          </div>
+        )}
+
       </Card>
 
 
@@ -623,10 +694,10 @@ export default function ManagerSchedules() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="scheduled">scheduled</SelectItem>
-                    <SelectItem value="active">active</SelectItem>
-                    <SelectItem value="completed">completed</SelectItem>
-                    <SelectItem value="cancelled">cancelled</SelectItem>
+                    <SelectItem value="scheduled">Lên lịch</SelectItem>
+                    <SelectItem value="in_progress">Đang tiến hành</SelectItem>
+                    <SelectItem value="completed">Hoàn thành</SelectItem>
+                    <SelectItem value="cancelled">Đã hủy</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

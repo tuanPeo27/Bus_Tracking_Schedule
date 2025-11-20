@@ -5,6 +5,10 @@ const getInfoAdmin = async (idUser) => {
     return instance.get(`admin/${idUser}`);
 }
 
+const getInfoParent = async (idUser) => {
+    return instance.get(`parents/${idUser}`);
+};
+
 const getInfoRoute = async (idRoute) => {
     return instance.get(`routes/${idRoute}`);
 }
@@ -15,6 +19,10 @@ const getInfoBus = async (idBus) => {
 
 const getInfoStudentByRouteId = async (idRoute) => {
     return instance.get(`students/route/${idRoute}`);
+}
+
+const getScheduleByDriverId = async (idDriver) => {
+    return instance.get(`schedules/driver/${idDriver}`)
 }
 
 const getInfoDriver = async (idUser) => {
@@ -34,11 +42,15 @@ const getAllRoute = async () => {
 }
 
 const getAllStudent = async () => {
-    return instance.get(`students`);
+    return instance.get(`students/`);
 }
 
 const getAllSchedule = async () => {
     return instance.get(`schedules`);
+}
+
+const getAllParent = async () => {
+    return instance.get(`parents/`)
 }
 
 const updateSchedule = async (data, idSchedule) => {
@@ -49,9 +61,86 @@ const createSchedule = async (data) => {
     return instance.post(`schedules/create`, data);
 }
 
+const createStudent = async (data) => {
+    return instance.post(`students/create`, data);
+}
+
+const createDriver = async (data) => {
+    return instance.post(`drivers/create`, data);
+}
+
 const deleteSchedule = async (idSchedule) => {
     return instance.delete(`schedules/delete/${idSchedule}`);
 }
 
+const deleteStudent = async (idStudent) => {
+    return instance.delete(`students/delete/${idStudent}`);
+}
 
-export { getInfoAdmin, getAllDriver, getAllBus, getAllRoute, getAllStudent, getAllSchedule, getInfoRoute, getInfoBus, getInfoStudentByRouteId, getInfoDriver, createSchedule, updateSchedule, deleteSchedule };
+const updateStudent = async (data, idStudent) => {
+    return instance.put(`students/edit/${idStudent}`, data)
+}
+
+const updateDriver = async (data, idDriver) => {
+    return instance.put(`drivers/edit/${idDriver}`, data)
+}
+
+const updateBus = async (data, idBus) => {
+    return instance.put(`buses/edit/${idBus}`, data)
+}
+
+const updateParent = async (data, idParent) => {
+    return instance.put(`parents/edit/${idParent}`, data)
+}
+
+const deleteDriver = async (idDriver) => {
+    return instance.delete(`drivers/delete/${idDriver}`);
+}
+
+const deleteBus = async (idBus) => {
+    return instance.delete(`buses/delete/${idBus}`);
+}
+
+const createBus = async (data) => {
+    return instance.post(`buses/create`, data);
+}
+
+const deleteParent = async (idParent) => {
+    return instance.delete(`parents/delete/${idParent}`);
+}
+
+const createParent = async (data) => {
+    return instance.post(`parents/create`, data);
+}
+
+export {
+    updateParent,
+    createParent,
+    deleteParent,
+    deleteBus,
+    updateBus,
+    createBus,
+    deleteDriver,
+    updateDriver,
+    createDriver,
+    updateStudent,
+    getScheduleByDriverId,
+    getInfoAdmin,
+    getAllDriver,
+    getAllBus,
+    getAllRoute,
+    getAllStudent,
+    getAllSchedule,
+    getInfoRoute,
+    getInfoBus,
+    getInfoStudentByRouteId,
+    getInfoDriver,
+    createSchedule,
+    updateSchedule,
+    deleteSchedule,
+    getAllParent,
+    getInfoParent,
+    deleteStudent,
+    createStudent,
+
+};

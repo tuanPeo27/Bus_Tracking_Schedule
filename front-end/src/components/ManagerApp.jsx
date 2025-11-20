@@ -15,6 +15,7 @@ import { useNotificationHelpers } from "./useNotificationHelpers";
 import { useNotifications } from "./NotificationContext";
 import { useIsMobile } from "./ui/use-mobile";
 import {
+  User,
   Users,
   Bus,
   Calendar,
@@ -32,6 +33,7 @@ import {
 import ManagerDashboard from "./manager/ManagerDashboard";
 import ManagerSchedules from "./manager/ManagerSchedules";
 import ManagerDrivers from "./manager/ManagerDrivers";
+import ManagerParents from "./manager/ManagerParent";
 import ManagerVehicles from "./manager/ManagerVehicles";
 import ManagerRoutes from "./manager/ManagerRoutes";
 import ManagerTracking from "./manager/ManagerTracking";
@@ -170,6 +172,16 @@ export function ManagerApp({ onBack }) {
                 <GraduationCap className="w-4 h-4" />
                 {isMobile ? "H.sinh" : "Học sinh"}
               </AnimatedTabsTrigger>
+
+              <AnimatedTabsTrigger
+                value="parents"
+                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                  }`}
+              >
+                <User className="w-4 h-4" />
+                {isMobile ? "P.huynh" : "Phụ huynh"}
+              </AnimatedTabsTrigger>
+
               <AnimatedTabsTrigger
                 value="drivers"
                 className={`${
@@ -243,6 +255,10 @@ export function ManagerApp({ onBack }) {
 
             <AnimatedTabsContent value="students" className="mt-0">
               <ManagerStudents />
+            </AnimatedTabsContent>
+
+            <AnimatedTabsContent value="parents" className="mt-0">
+              <ManagerParents />
             </AnimatedTabsContent>
 
             <AnimatedTabsContent value="drivers" className="mt-0">
