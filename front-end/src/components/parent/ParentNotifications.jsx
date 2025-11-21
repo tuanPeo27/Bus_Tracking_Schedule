@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -12,38 +12,61 @@ export function ParentNotifications({
   setNotificationsList,
 }) {
   const isMobile = useIsMobile();
-
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Đánh dấu đã đọc
+  /** Load dữ liệu khi mount */
+  useEffect(() => {
+    const stored = localStorage.getItem(`notifications_${parentId}`);
+    if (stored) {
+      try {
+        setNotificationsList(JSON.parse(stored));
+      } catch {
+        console.error("Lỗi parse JSON notifications");
+      }
+    }
+  }, [parentId, setNotificationsList]);
+
+  /** Mỗi khi danh sách thay đổi → lưu vào localStorage */
+  useEffect(() => {
+    localStorage.setItem(
+      `notifications_${parentId}`,
+      JSON.stringify(notificationsList)
+    );
+  }, [notificationsList, parentId]);
+
+  /** Đánh dấu đã đọc */
   const handleMarkAsRead = (id) => {
     setNotificationsList((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
     );
   };
 
+  /** Đọc tất cả */
   const handleMarkAllAsRead = () => {
     setNotificationsList((prev) => prev.map((n) => ({ ...n, isRead: true })));
   };
 
-  // Xóa từng thông báo
+  /** Xóa 1 thông báo */
   const handleDeleteNotification = (id) => {
     setNotificationsList((prev) => prev.filter((n) => n.id !== id));
   };
 
-  // Xóa tất cả
+  /** Xóa tất cả */
   const handleDeleteAll = () => {
     setNotificationsList([]);
+    localStorage.removeItem(`notifications_${parentId}`);
   };
 
   const unreadCount = notificationsList.filter((n) => !n.isRead).length;
 
+  /** Lọc thông báo */
   const filteredNotifications = notificationsList.filter(
     (n) =>
-      n.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      n.content?.toLowerCase().includes(searchTerm.toLowerCase())
+      (n.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (n.content || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  /** Icon cho từng loại thông báo */
   const getNotificationIcon = (type) => {
     switch (type) {
       case "arrival":
@@ -57,13 +80,21 @@ export function ParentNotifications({
     }
   };
 
+  /** Format thời gian */
   const formatTimestamp = (timestamp) => {
+    const time = new Date(timestamp);
+    if (isNaN(time)) return "N/A";
+
     const now = new Date();
-    const diff = now - new Date(timestamp);
+    const diff = now - time;
     const minutes = Math.floor(diff / 60000);
+
+    if (minutes < 1) return "Vừa xong";
     if (minutes < 60) return `${minutes} phút trước`;
+
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours} giờ trước`;
+
     const days = Math.floor(hours / 24);
     return `${days} ngày trước`;
   };
@@ -125,6 +156,7 @@ export function ParentNotifications({
             <CardContent className="flex justify-between items-start gap-3 p-4">
               <div className="flex gap-3 flex-1 items-start">
                 {getNotificationIcon(n.type)}
+
                 <div className="flex flex-col gap-1">
                   <p className="font-medium text-gray-800">{n.title}</p>
                   <p className="text-sm text-gray-600">{n.content}</p>
@@ -157,6 +189,7 @@ export function ParentNotifications({
           </Card>
         ))}
 
+        {/* Empty state */}
         {filteredNotifications.length === 0 && (
           <Card className="text-center py-8">
             <Bell className="w-10 h-10 mx-auto text-gray-400 mb-2" />
