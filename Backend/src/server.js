@@ -8,6 +8,7 @@ const User = require("./models/user");
 const Student = require("./models/student");
 const BusLocation = require("./models/busLocation");
 const Schedule = require("./models/schedule");
+const Bus = require("./models/bus");
 
 const userRoutes = require("./routes/userRoutes");
 const busRoutes = require("./routes/busRoutes");
@@ -20,6 +21,7 @@ const busStopRoutes = require("./routes/busStopRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 
 const bodyParser = require("body-parser");
+const BusStop = require("./models/busStop");
 
 const app = express();
 
@@ -48,60 +50,21 @@ const io = new Server(server, {
 
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
-
-  socket.on("incident-report", async (data) => {
-    try {
-      console.log("Incident report received:", data);
-      const { busId, driverId, message } = data;
-      if (!busId || !driverId || !message) {
-        console.error("Dữ liệu báo cáo sự cố không hợp lệ:", data);
-        return;
-      }
-
-      const driver = await User.findOne({
-        where: { id: driverId, role: "driver" },
-      });
-      if (!driver) {
-        console.log("Tài xế không tồn tại:", driverId);
-        socket.emit("incident-response", {
-          EC: -1,
-          EM: "Tài xế không tồn tại.",
-        });
-        return;
-      }
-
-      io.emit("admin-incident-alert", {
-        busId,
-        driverId,
-        message,
-        time: new Date(),
-      });
-
-      socket.emit("incident-response", {
-        EC: 0,
-        EM: "Đã gửi sự cố thành công!",
-      });
-    } catch (error) {
-      console.error("Lỗi xử lý báo cáo sự cố:", error);
-      socket.emit("incident-response", {
-        EC: -1,
-        EM: "Lỗi server khi gửi sự cố.",
-      });
-    }
-  });
-
-  socket.on("joinParentRoom", async (data) => {
-    console.log(data);
-    io.emit(`parent-notify-${data.parentId}`, "Tuan-kun");
-  });
+  // console.log("From page:", socket.handshake.query.page);
 
   socket.on("bus-location", async (data) => {
     try {
-      console.log("Bus location received:", data);
       const { busId, latitude, longitude } = data;
 
+      // console.log(data);
       if (!busId || !latitude || !longitude) {
         console.error("Dữ liệu vị trí xe buýt không hợp lệ:", data);
+        return;
+      }
+
+      const bus = await Bus.findByPk(busId);
+      if (!bus) {
+        console.error(`Bus ${busId} không tồn tại`);
         return;
       }
 
@@ -117,68 +80,84 @@ io.on("connection", (socket) => {
         longitude,
         timestamp: newLocation.timestamp,
       });
-
-      const now = new Date();
-      const today = now.toISOString().split("T")[0]; // YYYY-MM-DD
-
-      const schedule = await Schedule.findOne({
-        where: {
-          busId,
-          date: today,
-          status: { [Op.ne]: "completed" },
-        },
-      });
-
-      const arrival = new Date(`${today}T${schedule.arrival_time}`);
-      const arrivalDelay = (now - arrival) / (1000 * 60);
-
-      if (arrivalDelay > 10 && schedule.status === "in_progress") {
-        console.log(`Xe ${busId} đến muộn ${Math.round(arrivalDelay)} phút`);
-
-        const message = `Xe buýt số ${busId} đến muộn ${Math.round(
-          arrivalDelay
-        )} phút so với kế hoạch.`;
-
-        io.emit("admin-alert", { busId, message, time: now });
-        io.emit("parent-notify-all", { message, time: now });
-      }
     } catch (error) {
       console.error("Lỗi xử lý vị trí xe buýt:", error);
     }
   });
 
+  socket.on("student-pickup", async (data) => {
+    try {
+      const { stopId, pickup } = data;
+
+      if (!stopId || !Array.isArray(pickup)) {
+        console.error("Dữ liệu pickup không hợp lệ:", data);
+        return;
+      }
+
+      const stop = await BusStop.findByPk(stopId);
+      if (!stop) {
+        console.error("Không tìm thấy điểm đón:", stopId);
+        return;
+      }
+
+      for (const student of pickup) {
+        const parent = await User.findByPk(student.parent_id);
+        if (!parent) {
+          console.error("Không tìm thấy phụ huynh cho học sinh:", student.id);
+          continue;
+        }
+
+        const message = `Học sinh ${student.name} đã lên xe tại điểm ${stop.name}.`;
+
+        console.log(
+          `Gửi thông báo đến phụ huynh (${parent.username}): ${message}`
+        );
+
+        io.emit(`parent-notify-${parent.id}`, {
+          message,
+          studentId: student.id,
+        });
+      }
+    } catch (error) {
+      console.error("Lỗi xử lý học sinh lên xe:", error);
+    }
+  });
+
   socket.on("student-dropoff", async (data) => {
     try {
-      console.log("Student drop-off received:", data);
-      const { studentId } = data;
-      if (!studentId) {
-        console.error("Dữ liệu trả học sinh không hợp lệ:", data);
+      const { stopId, dropoff } = data;
+
+      if (!stopId || !Array.isArray(dropoff)) {
+        console.error("Dữ liệu drop-off không hợp lệ:", data);
         return;
       }
 
-      const student = await Student.findByPk(studentId);
-      if (!student) {
-        console.error("Học sinh không tồn tại:", studentId);
+      const stop = await BusStop.findByPk(stopId);
+      if (!stop) {
+        console.error("Không tìm thấy điểm trả:", stopId);
         return;
       }
 
-      const parent = await User.findByPk(student.parent_id);
-      if (!parent) {
-        console.error("Phụ huynh không tồn tại cho học sinh:", studentId);
-        return;
+      for (const student of dropoff) {
+        const parent = await User.findByPk(student.parent_id);
+        if (!parent) {
+          console.error("Không tìm thấy phụ huynh cho học sinh:", student.id);
+          continue;
+        }
+
+        const message = `Học sinh ${student.name} đã được trả tại điểm ${
+          stop.name
+        } vào lúc ${new Date().toLocaleTimeString()}.`;
+
+        console.log(
+          `Gửi thông báo đến phụ huynh (${parent.username}): ${message}`
+        );
+
+        io.emit(`parent-notify-${parent.id}`, {
+          message,
+          studentId: student.id,
+        });
       }
-
-      const message = `Học sinh ${student.name} đã được trả tại điểm ${student.dropoff_point
-        } an toan vào lúc ${new Date().toLocaleTimeString()}.`;
-
-      console.log(
-        `Gửi thông báo đến phụ huynh (${parent.username}): ${message}`
-      );
-
-      io.emit(`parent-notify-${parent.id}`, {
-        message,
-        studentId,
-      });
     } catch (error) {
       console.error("Lỗi xử lý trả học sinh:", error);
     }

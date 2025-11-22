@@ -22,7 +22,7 @@ export default function DriverGPS({ route_id, vehicle_id }) {
   // Tách ra 2 state riêng biệt cho đường đi
   const [staticRouteCoords, setStaticRouteCoords] = useState([]); // Đường nối các trạm (Cố định)
   const [driverToFirstStopCoords, setDriverToFirstStopCoords] = useState([]); // Đường từ Tài xế -> Trạm 1 (Thay đổi)
-  
+
   const [routeStatus, setRouteStatus] = useState("idle");
   
   // Cờ kiểm soát việc fetch
