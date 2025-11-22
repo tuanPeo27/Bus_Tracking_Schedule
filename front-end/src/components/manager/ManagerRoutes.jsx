@@ -1,381 +1,1105 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
-import { Avatar, AvatarFallback } from "../ui/avatar";
 import {
-  Bell,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../ui/table";
+import { Progress } from "../ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogDescription,
+} from "../ui/dialog";
+import { Label } from "../ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import { Alert, AlertDescription } from "../ui/alert";
+import { Textarea } from "../ui/textarea";
+import { motion } from "motion/react";
+import { useNotificationHelpers } from "../useNotificationHelpers";
+import {
+  Bus,
   Search,
-  MessageSquare,
+  Plus,
+  Edit,
+  Wrench,
+  Gauge,
+  Users,
+  Calendar,
   AlertTriangle,
-  Info,
-  Clock,
-  Check,
-  X,
-  Trash2,
   CheckCircle,
+  Clock,
+  Trash2,
+  Save,
+  X,
+  Eye,
+  MapPin
 } from "lucide-react";
+import { LeafletMap } from "../map/LeafletMap";
+import { getAllRoute, getBusStopByRouteId, createRoute, createBusStop, updateRoute, updateBusStop, deleteBusStop, deleteRoute, getAllSchedule } from "../../service/adminService";
 
-// Converted from TSX to JSX (removed any explicit type annotations, though none were majorly present)
-export default function DriverNotifications({ driverId }) {
+export default function ManagerRoutes() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filter, setFilter] = useState("all");
-  const [notifications, setNotifications] = useState([
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [showMap, setShowMap] = useState(false);
+  const [stopPoints, setStopPoints] = useState([]); // array: {lat, lng}
+  const [allRoute, setAllRoute] = useState([]);
+  const [newRoute, setNewRoute] = useState({
+    id: "",
+    name: "",
+    start_point: "",
+    end_point: "",
+  });
+  const [allBusStop, setAllBusStop] = useState([]);
+  const getAllRoutes = async () => {
+    try {
+      const res = await getAllRoute();
+      const dataRoute = Array.isArray(res.data) ? res.data : res.data?.DT || [];
+      if (res?.data?.EC === 0) {
+        const getInfoRoute = await Promise.all(
+          dataRoute.map(async (item) => {
+            const busStopInfo = await getBusStopByRouteId(item.id);
+            return { ...item, busStopInfo };
+          })
+        );
+        setAllRoute(getInfoRoute);
+        console.log(getInfoRoute);
+      } else {
+        setAllRoute([]);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách tuyến đường:", error);
+      setAllRoute([]);
+    }
+  };
+  const handleMapClick = (pt) => {
+    setStopPoints((prev) => [
+      ...prev,
+      {
+        lat: pt.lat,
+        lng: pt.lng,
+        name: `Trạm ${prev.length + 1}`,
+        order_index: prev.length + 1,
+      },
+    ]);
+  };
+
+  const handleAddRoute = async () => {
+    if (!newRoute.name || !newRoute.start_point || !newRoute.end_point) {
+      showError("Lỗi", "Vui lòng điền đầy đủ thông tin!");
+      return;
+    }
+    if (!stopPoints || stopPoints.length === 0) {
+      showError("Lỗi", "Vui lòng chọn ít nhất 1 điểm dừng trên bản đồ!");
+      return;
+    }
+
+    try {
+      // 1) Tạo route
+      const res = await createRoute({
+        name: newRoute.name,
+        start_point: newRoute.start_point,
+        end_point: newRoute.end_point,
+      });
+
+      const resData = res?.data || {};
+      // tìm id theo các cấu trúc trả về phổ biến
+      const createdRoute =
+        resData?.DT || resData || {};
+      const routeId = createdRoute?.id || createdRoute?.route?.id || createdRoute?.DT?.id;
+
+      if (!routeId) {
+        showError("Lỗi", "Không lấy được id tuyến sau khi tạo.");
+        return;
+      }
+
+      // 2) Tạo từng bus stop (gọi API createBusStop)
+      const stopPromises = stopPoints.map((s, idx) =>
+        createBusStop({
+          route_id: routeId,
+          name: s.name || `Trạm ${idx + 1}`,
+          latitude: String(s.lat),
+          longitude: String(s.lng),
+          order_index: s.order_index || idx + 1,
+        }).catch((err) => ({ __error: err }))
+      );
+
+      const results = await Promise.all(stopPromises);
+      const failed = results.filter((r) => r && r.__error);
+
+      if (failed.length > 0) {
+        showError("Cảnh báo", `Tạo tuyến thành công nhưng ${failed.length} điểm dừng không lưu được.`);
+      } else {
+        showSuccess("Thành công", "Đã tạo tuyến và tất cả điểm dừng.");
+      }
+
+      // reset và reload
+      setNewRoute({ id: "", name: "", start_point: "", end_point: "" });
+      setStopPoints([]);
+      setIsAddDialogOpen(false);
+      await getAllRoutes();
+    } catch (error) {
+      console.error("handleAddRoute error:", error);
+      showError("Lỗi", error?.message || "Không thể tạo tuyến.");
+    }
+  }
+
+  useEffect(() => {
+    getAllRoutes();
+
+  }, [])
+
+  const [vehicles, setVehicles] = useState([
     {
-      id: "NTF001",
-      type: "urgent",
-      title: "Thay đổi lịch trình khẩn cấp",
-      content:
-        "Lịch trình ngày mai (20/12) đã được thay đổi. Thời gian bắt đầu từ 06:30 thay vì 07:00. Vui lòng xác nhận đã nhận được thông báo.",
-      sender: "Phòng Điều Hành",
-      senderType: "admin",
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      isRead: false,
-      requiresAction: true,
+      id: "XE001",
+      licensePlate: "29A-12345",
+      brand: "Hyundai Universe",
+      model: "2020",
+      seats: 45,
+      avgSpeed: 35,
+      status: "active",
+      assignedDriver: "Nguyễn Văn Minh",
+      currentRoute: "Tuyến 1",
+      fuelLevel: 85,
+      mileage: 125000,
+      lastMaintenance: "2024-11-15",
+      nextMaintenance: "2024-12-30",
+      totalTrips: 1250,
+      condition: "good",
     },
     {
-      id: "NTF002",
-      type: "message",
-      title: "Tin nhắn từ phụ huynh",
-      content:
-        "Chào anh tài xế, con em tôi (Nguyễn Minh Anh - lớp 10A1) hôm nay sẽ không đi học. Xin cảm ơn anh!",
-      sender: "Bà Nguyễn Thị Lan",
-      senderType: "parent",
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      isRead: false,
-      requiresAction: false,
+      id: "XE002",
+      licensePlate: "29A-67890",
+      brand: "Thaco Universe",
+      model: "2021",
+      seats: 42,
+      avgSpeed: 32,
+      status: "active",
+      assignedDriver: "Trần Văn Hùng",
+      currentRoute: "Tuyến 2",
+      fuelLevel: 92,
+      mileage: 98000,
+      lastMaintenance: "2024-12-01",
+      nextMaintenance: "2025-01-15",
+      totalTrips: 980,
+      condition: "excellent",
     },
     {
-      id: "NTF003",
-      type: "info",
-      title: "Thông báo bảo dưỡng xe",
-      content:
-        "Xe 29A-12345 đã đến hạn bảo dưỡng định kỳ. Vui lòng đưa xe đến garage vào cuối tuần này.",
-      sender: "Phòng Kỹ Thuật",
-      senderType: "admin",
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-      isRead: true,
-      requiresAction: false,
+      id: "XE003",
+      licensePlate: "29A-11111",
+      brand: "Hyundai County",
+      model: "2019",
+      seats: 35,
+      avgSpeed: 30,
+      status: "break",
+      assignedDriver: "Lê Thị Lan",
+      currentRoute: "Tuyến 3",
+      fuelLevel: 45,
+      mileage: 145000,
+      lastMaintenance: "2024-10-20",
+      nextMaintenance: "2024-12-20",
+      totalTrips: 1580,
+      condition: "fair",
     },
     {
-      id: "NTF004",
-      type: "warning",
-      title: "Cảnh báo thời tiết",
-      content:
-        "Dự báo có mưa lớn vào chiều nay. Anh vui lòng lái xe chậm và cẩn thận, ưu tiên an toàn.",
-      sender: "Hệ thống tự động",
-      senderType: "system",
-      timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
-      isRead: true,
-      requiresAction: false,
-    },
-    {
-      id: "NTF005",
-      type: "message",
-      title: "Yêu cầu thay đổi điểm đón",
-      content:
-        "Xin chào anh, do tình huống đặc biệt, ngày mai em muốn thay đổi điểm đón từ Ngã tư Hàng Xanh sang Chợ Bến Thành. Anh có thể hỗ trợ được không?",
-      sender: "Anh Trần Văn Hoàng",
-      senderType: "parent",
-      timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-      isRead: true,
-      requiresAction: true,
+      id: "XE004",
+      licensePlate: "29A-22222",
+      brand: "Isuzu NQR",
+      model: "2022",
+      seats: 38,
+      avgSpeed: 28,
+      status: "maintenance",
+      assignedDriver: null,
+      currentRoute: null,
+      fuelLevel: 0,
+      mileage: 65000,
+      lastMaintenance: "2024-12-18",
+      nextMaintenance: "2025-02-01",
+      totalTrips: 720,
+      condition: "maintenance",
     },
   ]);
+  // DÒNG NÀY ĐÃ ĐƯỢC SỬA: Loại bỏ cú pháp TypeScript gây lỗi "any is not defined"
+  const [selectedVehicleId, setSelectedVehicleId] = useState(null);
 
-  const handleMarkAsRead = (notificationId) => {
-    setNotifications((prev) =>
-      prev.map((notification) =>
-        notification.id === notificationId
-          ? { ...notification, isRead: true }
-          : notification
-      )
-    );
-  };
+  const [newVehicle, setNewVehicle] = useState({
+    licensePlate: "",
+    brand: "",
+    model: "",
+    seats: "",
+    status: "active",
+    condition: "good",
+  });
+  const { showSuccess, showInfo, showError } = useNotificationHelpers();
 
-  const handleMarkAllAsRead = () => {
-    setNotifications((prev) =>
-      prev.map((notification) => ({ ...notification, isRead: true }))
-    );
-  };
-
-  const handleConfirmAction = (notificationId) => {
-    setNotifications((prev) =>
-      prev.map((notification) =>
-        notification.id === notificationId
-          ? { ...notification, isRead: true, requiresAction: false }
-          : notification
-      )
-    );
-    console.log(`Confirmed action for notification: ${notificationId}`);
-  };
-
-  const handleRejectAction = (notificationId) => {
-    setNotifications((prev) =>
-      prev.map((notification) =>
-        notification.id === notificationId
-          ? { ...notification, isRead: true, requiresAction: false }
-          : notification
-      )
-    );
-    console.log(`Rejected action for notification: ${notificationId}`);
-  };
-
-  const handleDeleteNotification = (notificationId) => {
-    setNotifications((prev) =>
-      prev.filter((notification) => notification.id !== notificationId)
-    );
-  };
-
-  const getNotificationIcon = (type) => {
-    switch (type) {
-      case "urgent":
-        return <AlertTriangle className="w-5 h-5 text-red-500" />;
-      case "warning":
-        return <AlertTriangle className="w-5 h-5 text-orange-500" />;
-      case "message":
-        return <MessageSquare className="w-5 h-5 text-blue-500" />;
-      case "info":
-        return <Info className="w-5 h-5 text-green-500" />;
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case "active":
+        return (
+          <Badge className="bg-green-100 text-green-800">Đang hoạt động</Badge>
+        );
+      case "break":
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800">Tạm dừng</Badge>
+        );
+      case "maintenance":
+        return <Badge className="bg-blue-100 text-blue-800">Bảo trì</Badge>;
+      case "breakdown":
+        return <Badge className="bg-red-100 text-red-800">Hỏng hóc</Badge>;
       default:
-        return <Bell className="w-5 h-5" />;
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  const getSenderAvatar = (senderType, sender) => {
-    const initials = sender
-      .split(" ")
-      .map((word) => word[0])
-      .join("")
-      .slice(0, 2);
-    const bgColor =
-      senderType === "admin"
-        ? "bg-blue-500"
-        : senderType === "parent"
-          ? "bg-green-500"
-          : "bg-gray-500";
-
-    return (
-      <Avatar className="w-8 h-8">
-        <AvatarFallback className={`${bgColor} text-white`}>
-          {initials}
-        </AvatarFallback>
-      </Avatar>
-    );
+  const getConditionBadge = (condition) => {
+    switch (condition) {
+      case "excellent":
+        return <Badge className="bg-green-100 text-green-800">Tuyệt vời</Badge>;
+      case "good":
+        return <Badge className="bg-blue-100 text-blue-800">Tốt</Badge>;
+      case "fair":
+        return <Badge className="bg-yellow-100 text-yellow-800">Khá</Badge>;
+      case "poor":
+        return <Badge className="bg-orange-100 text-orange-800">Kém</Badge>;
+      case "maintenance":
+        return <Badge className="bg-red-100 text-red-800">Bảo trì</Badge>;
+      default:
+        return <Badge variant="outline">{condition}</Badge>;
+    }
   };
 
-  const formatTimestamp = (timestamp) => {
+  const getFuelLevelColor = (level) => {
+    if (level > 70) return "bg-green-500";
+    if (level > 30) return "bg-yellow-500";
+    return "bg-red-500";
+  };
+
+  const isMaintenanceDue = (nextMaintenance) => {
+    const nextDate = new Date(nextMaintenance);
     const now = new Date();
-    const diff = now.getTime() - timestamp.getTime();
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-    if (minutes < 60) return `${minutes} phút trước`;
-    if (hours < 24) return `${hours} giờ trước`;
-    return `${days} ngày trước`;
+    const daysUntil = Math.ceil(
+      (nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return daysUntil <= 7;
   };
 
-  const filteredNotifications = notifications.filter((notification) => {
+  const filteredRoutes = allRoute.filter((route) => {
     const matchesSearch =
-      notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notification.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notification.sender.toLowerCase().includes(searchTerm.toLowerCase());
+      route.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      route.start_point.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      route.end_point.toLowerCase().includes(searchTerm.toLowerCase());
 
-    if (filter === "unread") return matchesSearch && !notification.isRead;
-    if (filter === "important")
-      return (
-        matchesSearch &&
-        (notification.type === "urgent" || notification.requiresAction)
-      );
     return matchesSearch;
   });
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const stats = {
+    total: vehicles.length,
+    active: vehicles.filter((v) => v.status === "active").length,
+    maintenance: vehicles.filter((v) => v.status === "maintenance").length,
+    breakdown: vehicles.filter((v) => v.status === "breakdown").length,
+  };
+
+
+
+
+
+  const handleUpdateVehicle = () => {
+    if (!selectedVehicle) return;
+
+    setVehicles((prev) =>
+      prev.map((vehicle) =>
+        vehicle.id === selectedVehicle.id ? selectedVehicle : vehicle
+      )
+    );
+
+    showSuccess(
+      "Cập nhật thành công",
+      `Thông tin xe ${selectedVehicle?.licensePlate} đã được cập nhật!`
+    );
+    setIsEditDialogOpen(false);
+    setSelectedVehicle(null);
+  };
+
+  const handleDeleteVehicle = (vehicleId) => {
+    const vehicle = vehicles.find((v) => v.id === vehicleId);
+    if (!vehicle) return;
+
+    if (confirm(`Bạn có chắc chắn muốn xóa xe ${vehicle.licensePlate}?`)) {
+      setVehicles((prev) => prev.filter((v) => v.id !== vehicleId));
+      showSuccess("Đã xóa", `Xe ${vehicle.licensePlate} đã được xóa!`);
+    }
+  };
+
+  const handleRowClick = (vehicleId) => {
+    setSelectedVehicleId(vehicleId);
+    setTimeout(() => setSelectedVehicleId(null), 2000); // Remove highlight after 2 seconds
+  };
+
+  // STATE và hàm cho Edit Route
+  const [isRouteEditOpen, setIsRouteEditOpen] = useState(false);
+  const [routeEdit, setRouteEdit] = useState(null); // { id, name, start_point, end_point }
+  const [editStopPoints, setEditStopPoints] = useState([]); // array: { id?, lat, lng, name, order_index }
+  const [removedStopIds, setRemovedStopIds] = useState([]); // ids to delete on save
+
+  // Delete dialog state (mirror ManagerParent)
+  const [isDeleteRouteDialogOpen, setIsDeleteRouteDialogOpen] = useState(false);
+  const [routeToDelete, setRouteToDelete] = useState(null);
+
+  // helper: lấy mảng stops từ route.busStopInfo (tùy cấu trúc response)
+  const extractStops = (busStopInfo) => {
+    const maybe = busStopInfo?.data?.DT || busStopInfo?.data || busStopInfo?.DT || busStopInfo;
+    return Array.isArray(maybe) ? maybe : [];
+  };
+
+  const openRouteEditor = (route) => {
+    // populate route fields
+    setRouteEdit({
+      id: route.id,
+      name: route.name || "",
+      start_point: route.start_point || "",
+      end_point: route.end_point || "",
+    });
+
+    // map existing stops -> editStopPoints
+    const rawStops = extractStops(route.busStopInfo);
+    const mapped = (rawStops || []).map((s, i) => ({
+      id: s.id || s.ID || s.bus_stop_id || null,
+      lat: Number(s.latitude || s.lat),
+      lng: Number(s.longitude || s.lng),
+      name: s.name || `Trạm ${i + 1}`,
+      order_index: s.order_index || i + 1,
+    }));
+    setEditStopPoints(mapped);
+    setRemovedStopIds([]);
+    setIsRouteEditOpen(true);
+  };
+
+  // map click trong edit dialog -> thêm điểm dừng mới
+  const handleEditMapClick = (pt) => {
+    setEditStopPoints((prev) => [
+      ...prev,
+      { lat: pt.lat, lng: pt.lng, name: `Trạm ${prev.length + 1}`, order_index: prev.length + 1 },
+    ]);
+  };
+
+
+
+  // xóa điểm dừng trong edit dialog
+  const handleRemoveEditStop = (index) => {
+    setEditStopPoints((prev) => {
+      const removed = prev[index];
+      if (removed && removed.id) setRemovedStopIds((r) => [...r, removed.id]);
+      return prev.filter((_, i) => i !== index).map((s, i) => ({ ...s, order_index: i + 1 }));
+    });
+  };
+
+  // Lưu thay đổi tuyến + stops lên backend
+  const handleSaveEditedRoute = async () => {
+    if (!routeEdit || !routeEdit.id) {
+      showError("Lỗi", "Không có tuyến để cập nhật.");
+      return;
+    }
+    if (!routeEdit.name || !routeEdit.start_point || !routeEdit.end_point) {
+      showError("Lỗi", "Vui lòng điền đầy đủ thông tin tuyến.");
+      return;
+    }
+
+    try {
+      // 1) cập nhật route
+      // sử dụng service updateRoute
+      const updRouteRes = await updateRoute(
+        {
+          name: routeEdit.name,
+          start_point: routeEdit.start_point,
+          end_point: routeEdit.end_point,
+        },
+        routeEdit.id
+      );
+      const updData = updRouteRes?.data || updRouteRes || {};
+      if (!((updData?.EC !== undefined && updData.EC === 0) || updRouteRes?.status === 200 || updRouteRes?.ok)) {
+        throw new Error(updData?.EM || `Cập nhật tuyến thất bại`);
+      }
+
+      // 2) xử lý stops: update tồn tại, tạo mới, xóa đã đánh dấu
+      const stopPromises = [];
+
+      editStopPoints.forEach((s, idx) => {
+        const body = {
+          name: s.name,
+          latitude: String(s.lat),
+          longitude: String(s.lng),
+          order_index: s.order_index || idx + 1,
+        };
+        if (s.id) {
+          // update existing using adminService.updateBusStop
+          stopPromises.push(
+            updateBusStop(body, s.id).catch((err) => Promise.reject(err))
+          );
+        } else {
+          // create new using adminService.createBusStop
+          stopPromises.push(createBusStop({ route_id: routeEdit.id, ...body }).catch((err) => Promise.reject(err)));
+        }
+      });
+
+      // xóa các stop đã bị remove (sử dụng adminService.deleteBusStop)
+      removedStopIds.forEach((id) => {
+        stopPromises.push(deleteBusStop(id).catch((err) => Promise.reject(err)));
+      });
+
+      const results = await Promise.allSettled(stopPromises);
+      const rejected = results.filter((r) => r.status === "rejected");
+      if (rejected.length > 0) {
+        console.warn("Một số thao tác điểm dừng lỗi:", rejected);
+        showError("Cảnh báo", "Cập nhật tuyến xong nhưng một số điểm dừng không cập nhật được.");
+      } else {
+        showSuccess("Thành công", "Đã cập nhật tuyến và điểm dừng.");
+      }
+
+      setIsRouteEditOpen(false);
+      setRouteEdit(null);
+      setEditStopPoints([]);
+      setRemovedStopIds([]);
+      await getAllRoutes();
+    } catch (err) {
+      console.error("Lỗi khi lưu cập nhật tuyến:", err);
+      showError("Lỗi", err?.message || "Không thể lưu thay đổi tuyến.");
+    }
+  };
+
+  // Mở dialog xóa (sẽ hiện dialog confirm)
+  const openDeleteRouteDialog = (route) => {
+    setRouteToDelete(route);
+    setIsDeleteRouteDialogOpen(true);
+  };
+
+  // Thực hiện xóa sau khi người dùng xác nhận trong dialog
+  const confirmDeleteRoute = async () => {
+    if (!routeToDelete || !routeToDelete.id) {
+      showError("Lỗi", "Không có tuyến để xóa.");
+      setIsDeleteRouteDialogOpen(false);
+      setRouteToDelete(null);
+      return;
+    }
+
+    try {
+      // --- NEW: kiểm tra xem có lịch trình tham chiếu tới route này không ---
+      const schedulesRes = await getAllSchedule();
+      const schedulesData = Array.isArray(schedulesRes?.data) ? schedulesRes.data : (schedulesRes?.data?.DT || []);
+      const referencing = (schedulesData || []).filter((s) => String(s.route_id) === String(routeToDelete.id));
+      if (referencing.length > 0) {
+        showError("Không thể xóa", `Tuyến đang có ${referencing.length} lịch trình liên quan. Vui lòng xóa hoặc chuyển các lịch trình đó trước khi xóa tuyến.`);
+        setIsDeleteRouteDialogOpen(false);
+        setRouteToDelete(null);
+        return;
+      }
+
+      const routeId = routeToDelete.id;
+      // 1) Lấy danh sách điểm dừng của tuyến
+      const stopsRes = await getBusStopByRouteId(routeId);
+      const stops = (stopsRes?.data?.DT) || (stopsRes?.data) || [];
+
+      // 2) Xóa tất cả điểm dừng (song song)
+      const deleteStopPromises = (stops || []).map((s) => {
+        const id = s.id || s.ID || s.bus_stop_id;
+        if (!id) return Promise.resolve({ skipped: true });
+        return deleteBusStop(id).catch((err) => ({ __error: err, id }));
+      });
+      const stopResults = await Promise.allSettled(deleteStopPromises);
+      const stopFailed = stopResults.filter(r => r.status === "rejected" || (r.value && r.value.__error));
+
+      // 3) Xóa route
+      const delRouteRes = await deleteRoute(routeId);
+      const delData = delRouteRes?.data || delRouteRes || {};
+      const routeDeleted = (delData?.EC !== undefined && delData.EC === 0) || delRouteRes?.status === 200 || delRouteRes?.ok;
+
+      if (!routeDeleted) {
+        console.warn("delete route response:", delRouteRes);
+        showError("Lỗi", "Không xóa được tuyến. Vui lòng thử lại.");
+      } else {
+        if (stopFailed.length > 0) {
+          showError("Cảnh báo", `Đã xóa tuyến nhưng ${stopFailed.length} điểm dừng không xóa được.`);
+        } else {
+          showSuccess("Thành công", "Đã xóa tuyến và các điểm dừng liên quan.");
+        }
+        await getAllRoutes();
+      }
+    } catch (err) {
+      console.error("Lỗi khi xóa tuyến:", err);
+      showError("Lỗi", err?.message || "Xảy ra lỗi khi xóa tuyến.");
+    } finally {
+      setIsDeleteRouteDialogOpen(false);
+      setRouteToDelete(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid md:grid-cols-1 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Bus className="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Tổng tuyến đường</p>
+                <p className="font-semibold">{allRoute?.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+      </div>
+
+      {/* Header */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="w-5 h-5" />
-            Thông báo
-            {unreadCount > 0 && (
-              <Badge className="bg-red-500 text-white">{unreadCount} mới</Badge>
-            )}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Bus className="w-5 h-5" />
+              Quản lý Tuyến đường
+            </CardTitle>
+
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => setIsAddDialogOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Thêm tuyến đường
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm thông báo..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={filter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter("all")}
-              >
-                Tất cả
-              </Button>
-              <Button
-                variant={filter === "unread" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter("unread")}
-              >
-                Chưa đọc ({unreadCount})
-              </Button>
-              <Button
-                variant={filter === "important" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter("important")}
-              >
-                Quan trọng
-              </Button>
-              {unreadCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleMarkAllAsRead}
-                  className="text-green-600 hover:text-green-700"
-                >
-                  <CheckCircle className="w-4 h-4 mr-1" />
-                  Đọc tất cả
-                </Button>
-              )}
-            </div>
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Tìm kiếm theo tên tuyến, điểm bắt đầu, điểm kết thúc..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
           </div>
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
-        {filteredNotifications.map((notification) => (
-          <Card
-            key={notification.id}
-            className={`${!notification.isRead
-              ? "border-l-4 border-l-blue-500 bg-blue-50/30"
-              : ""
-              }`}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 pt-1">
-                  {getNotificationIcon(notification.type)}
-                </div>
+      {/* Vehicles Table */}
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Mã tuyến</TableHead>
+                <TableHead>Tên tuyến</TableHead>
+                <TableHead>Điểm bắt đầu</TableHead>
+                <TableHead>Điểm kết thúc</TableHead>
+                <TableHead>Điểm dừng</TableHead>
+                <TableHead>Thao tác</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredRoutes.map((route) => (
+                <TableRow
+                  key={route.id}
+                  className={`cursor-pointer transition-colors ${selectedVehicleId === route.id
+                    ? "bg-blue-50 border-l-4 border-blue-500"
+                    : ""
+                    }`}
+                  onClick={() => handleRowClick(route.id)}
+                >
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{route?.id}</p>
 
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-medium">{notification.title}</h4>
-                        {!notification.isRead && (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {notification.content}
-                      </p>
                     </div>
+                  </TableCell>
 
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3" />
-                      {formatTimestamp(notification.timestamp)}
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{route?.name}</p>
+
                     </div>
-                  </div>
+                  </TableCell>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {getSenderAvatar(
-                        notification.senderType,
-                        notification.sender
-                      )}
-                      <div className="text-sm">
-                        <p className="font-medium">{notification.sender}</p>
-                        <p className="text-muted-foreground">
-                          {notification.senderType === "admin"
-                            ? "Quản lý"
-                            : notification.senderType === "parent"
-                              ? "Phụ huynh"
-                              : "Hệ thống"}
-                        </p>
-                      </div>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{route?.start_point}</p>
+
                     </div>
+                  </TableCell>
 
-                    <div className="flex items-center gap-2">
-                      {notification.requiresAction && (
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            className="h-8 px-3"
-                            onClick={() => handleConfirmAction(notification.id)}
-                          >
-                            <Check className="w-3 h-3 mr-1" />
-                            Xác nhận
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 px-3"
-                            onClick={() => handleRejectAction(notification.id)}
-                          >
-                            <X className="w-3 h-3 mr-1" />
-                            Từ chối
-                          </Button>
-                        </div>
-                      )}
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{route?.end_point}</p>
 
-                      {!notification.isRead && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-3"
-                          onClick={() => handleMarkAsRead(notification.id)}
-                        >
-                          Đánh dấu đã đọc
-                        </Button>
-                      )}
+                    </div>
+                  </TableCell>
 
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{route?.busStopInfo?.data?.DT["length"]}</p>
+
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        className="h-8 px-2 text-red-500 hover:text-red-700"
-                        onClick={() =>
-                          handleDeleteNotification(notification.id)
-                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openRouteEditor(route);
+                        }}
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteRouteDialog(route);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Maintenance Alerts */}
+
+      {/* Add Vehicle Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Thêm tuyến đường mới</DialogTitle>
+            <DialogDescription>
+              Điền thông tin để thêm tuyến đường mới vào hệ thống
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="nameRoute">Tên tuyến</Label>
+              <Input
+                id="nameRoute"
+                value={newRoute.name}
+                onChange={(e) =>
+                  setNewRoute((prev) => ({
+                    ...prev,
+                    name: e.target.value,
+                  }))
+                }
+                placeholder="VD: 29A-12345"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="startPoint">Điểm bắt đầu</Label>
+              <Input
+                id="startPoint"
+                value={newRoute.start_point}
+                onChange={(e) =>
+                  setNewRoute((prev) => ({ ...prev, start_point: e.target.value }))
+                }
+                placeholder="VD: Hyundai"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="endPoint">Điểm kết thúc</Label>
+              <Input
+                id="endPoint"
+                value={newRoute.end_point}
+                onChange={(e) =>
+                  setNewRoute((prev) => ({ ...prev, end_point: e.target.value }))
+                }
+                placeholder="VD: Universe"
+              />
+            </div>
+
+
+            <div className="p-4 space-y-4">
+              <Label>Số điểm dừng</Label>
+              {/* Nút bấm: Text và chức năng thay đổi theo trạng thái showMap */}
+              <Button
+                type="button"
+                className="w-full justify-center"
+                variant={showMap ? 'outline' : 'default'}
+                onClick={() => setShowMap((prev) => !prev)}
+              >
+                {showMap ? "Ẩn bản đồ" : "Mở bản đồ & Bấm để chọn điểm dừng"}
+              </Button>
+
+              {/* Phần bản đồ chỉ hiển thị khi showMap là true */}
+              {showMap && (
+                <div className="mt-4 border rounded overflow-hidden">
+                  <LeafletMap
+                    height="400px"
+                    zoom={15}
+                    markers={stopPoints.map((p, i) => ({
+                      position: { lat: p.lat, lng: p.lng },
+                      title: p.name || `Trạm ${i + 1}`,
+                      draggable: false,
+
+                    }))}
+                    onMapClick={handleMapClick}
+                  />
+                  <div className="p-3">
+                    <Label>Số điểm dừng: {stopPoints.length}</Label>
+                    <ul className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                      {stopPoints.map((p, idx) => (
+                        <li key={idx} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                          <div>
+                            <div className="text-sm font-medium">#{idx + 1} — {p.lat.toFixed(6)}, {p.lng.toFixed(6)}</div>
+                            <input
+                              className="border rounded px-2 py-1 mt-1 text-sm w-56"
+                              value={p.name || `Trạm ${idx + 1}`}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setStopPoints(prev => prev.map((s, i) => i === idx ? { ...s, name: v } : s));
+                              }}
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => {
+                              setStopPoints(prev => prev.filter((_, i) => i !== idx));
+                            }}>Xóa</Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-2 flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setStopPoints([])}>Xóa tất cả</Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              )}
+            </div>
 
-        {filteredNotifications.length === 0 && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Bell className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="font-medium mb-2">Không có thông báo</h3>
-              <p className="text-muted-foreground">
-                {filter === "unread"
-                  ? "Bạn đã đọc hết tất cả thông báo."
-                  : filter === "important"
-                    ? "Không có thông báo quan trọng nào."
-                    : "Không tìm thấy thông báo phù hợp."}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              Hủy
+            </Button>
+            <Button onClick={handleAddRoute}>
+              <Save className="w-4 h-4 mr-2" />
+              Thêm tuyến
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Vehicle Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Chỉnh sửa thông tin xe</DialogTitle>
+            <DialogDescription>
+              Cập nhật thông tin tuyến đường trong hệ thống
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedVehicle && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editLicensePlate">Biển số xe</Label>
+                <Input
+                  id="editLicensePlate"
+                  value={selectedVehicle.licensePlate}
+                  onChange={(e) =>
+                    setSelectedVehicle((prev) => ({
+                      ...prev,
+                      licensePlate: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="editBrand">Hãng xe</Label>
+                <Input
+                  id="editBrand"
+                  value={selectedVehicle.brand}
+                  onChange={(e) =>
+                    setSelectedVehicle((prev) => ({
+                      ...prev,
+                      brand: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="editModel">Dòng xe</Label>
+                <Input
+                  id="editModel"
+                  value={selectedVehicle.model}
+                  onChange={(e) =>
+                    setSelectedVehicle((prev) => ({
+                      ...prev,
+                      model: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="editSeats">Số ghế</Label>
+                <Input
+                  id="editSeats"
+                  type="number"
+                  value={selectedVehicle.seats}
+                  onChange={(e) =>
+                    setSelectedVehicle((prev) => ({
+                      ...prev,
+                      seats: parseInt(e.target.value),
+                    }))
+                  }
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="editStatus">Trạng thái</Label>
+                <Select
+                  value={selectedVehicle.status}
+                  onValueChange={(value) =>
+                    setSelectedVehicle((prev) => ({ ...prev, status: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Đang hoạt động</SelectItem>
+                    <SelectItem value="break">Tạm dừng</SelectItem>
+                    <SelectItem value="maintenance">Bảo trì</SelectItem>
+                    <SelectItem value="breakdown">Hỏng hóc</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="editCondition">Tình trạng</Label>
+                <Select
+                  value={selectedVehicle.condition}
+                  onValueChange={(value) =>
+                    setSelectedVehicle((prev) => ({
+                      ...prev,
+                      condition: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="excellent">Tuyệt vời</SelectItem>
+                    <SelectItem value="good">Tốt</SelectItem>
+                    <SelectItem value="fair">Khá</SelectItem>
+                    <SelectItem value="poor">Kém</SelectItem>
+                    <SelectItem value="maintenance">Bảo trì</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button onClick={handleUpdateVehicle}>
+              <Save className="w-4 h-4 mr-2" />
+              Cập nhật
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vehicle Details Dialog */}
+
+      {/* Edit Route Dialog */}
+      <Dialog open={isRouteEditOpen} onOpenChange={setIsRouteEditOpen}>
+        <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Chỉnh sửa tuyến đường</DialogTitle>
+            <DialogDescription>
+              Cập nhật thông tin tuyến đường và các điểm dừng
+            </DialogDescription>
+          </DialogHeader>
+
+          {routeEdit && (
+            <div className="space-y-4">
+              {/* Route Info (same as Add) */}
+              <div>
+                <Label htmlFor="editRouteName">Tên tuyến</Label>
+                <Input
+                  id="editRouteName"
+                  value={routeEdit.name}
+                  onChange={(e) =>
+                    setRouteEdit((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  placeholder="VD: Tuyến 1"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editStartPoint">Điểm bắt đầu</Label>
+                  <Input
+                    id="editStartPoint"
+                    value={routeEdit.start_point}
+                    onChange={(e) =>
+                      setRouteEdit((prev) => ({ ...prev, start_point: e.target.value }))
+                    }
+                    placeholder="VD: Bến xe Mỹ Đình"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="editEndPoint">Điểm kết thúc</Label>
+                  <Input
+                    id="editEndPoint"
+                    value={routeEdit.end_point}
+                    onChange={(e) =>
+                      setRouteEdit((prev) => ({ ...prev, end_point: e.target.value }))
+                    }
+                    placeholder="VD: Bến xe Lương Yên"
+                  />
+                </div>
+              </div>
+
+              {/* Stops section - mirror Add UI */}
+              <div className="p-4 space-y-4">
+                <Label>Số điểm dừng</Label>
+                <Button
+                  type="button"
+                  className="w-full justify-center"
+                  variant={showMap ? "outline" : "default"}
+                  onClick={() => setShowMap((prev) => !prev)}
+                >
+                  {showMap ? "Ẩn bản đồ" : "Mở bản đồ & Bấm để chọn điểm dừng"}
+                </Button>
+
+                {showMap && (
+                  <div className="mt-4 border rounded overflow-hidden">
+                    <LeafletMap
+                      height="400px"
+                      zoom={15}
+                      markers={editStopPoints.map((p, i) => ({
+                        position: { lat: p.lat, lng: p.lng },
+                        title: p.name || `Trạm ${i + 1}`,
+                        draggable: false,
+
+                      }))}
+                      onMapClick={handleEditMapClick}
+                    />
+                    <div className="p-3">
+                      <Label>Số điểm dừng: {editStopPoints.length}</Label>
+                      <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                        {editStopPoints.map((p, idx) => (
+                          <li key={idx} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                            <div>
+                              <div className="text-sm font-medium">#{idx + 1} — {p.lat.toFixed(6)}, {p.lng.toFixed(6)}</div>
+                              <input
+                                className="border rounded px-2 py-1 mt-1 text-sm w-56"
+                                value={p.name || `Trạm ${idx + 1}`}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setEditStopPoints(prev => prev.map((s, i) => i === idx ? { ...s, name: v } : s));
+                                }}
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => handleRemoveEditStop(idx)}>Xóa</Button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-2 flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => { setRemovedStopIds(editStopPoints.filter(s => s.id).map(s => s.id)); setEditStopPoints([]); }}>Xóa tất cả</Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsRouteEditOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button onClick={handleSaveEditedRoute}>
+              <Save className="w-4 h-4 mr-2" />
+              Lưu thay đổi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Route Dialog */}
+      <Dialog open={isDeleteRouteDialogOpen} onOpenChange={setIsDeleteRouteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác nhận xóa tuyến</DialogTitle>
+            <DialogDescription>
+              Hành động này sẽ xóa tuyến và tất cả điểm dừng liên quan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Alert>
+              <AlertDescription>
+                Bạn có chắc chắn muốn xóa tuyến{" "}
+                <strong>{routeToDelete?.name || routeToDelete?.id}</strong>? Hành động này không thể hoàn tác.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsDeleteRouteDialogOpen(false); setRouteToDelete(null); }}>
+              Hủy
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteRoute}>
+              Xóa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
+
   );
 }

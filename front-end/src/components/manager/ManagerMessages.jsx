@@ -20,6 +20,7 @@ import {
   Bell,
   AlertTriangle,
 } from "lucide-react";
+import socket from "../../setup/socket";
 
 export default function ManagerMessages() {
   const [selectedRecipient, setSelectedRecipient] = useState("");
@@ -68,13 +69,67 @@ export default function ManagerMessages() {
   const handleSendMessage = () => {
     if (!message.trim() || !selectedRecipient) return;
 
-    // Simulate sending message
-    console.log("Sending message:", {
-      recipient: selectedRecipient,
-      specificRecipient,
-      type: messageType,
+    const payload = {
+      title:
+        messageType === "urgent"
+          ? "Thông báo khẩn"
+          : messageType === "reminder"
+            ? "Lời nhắc"
+            : "Thông báo",
       content: message,
-    });
+      type: messageType,
+      from: "manager",
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      // Emit depending on recipient
+      if (selectedRecipient === "all_parents") {
+        socket.emit(
+          "manager-send-notification",
+          { target: "all_parents", ...payload },
+          (ack) => {
+            if (ack?.ok) alert("Đã gửi cho tất cả phụ huynh");
+          }
+        );
+      } else if (selectedRecipient === "all_drivers") {
+        socket.emit(
+          "manager-send-notification",
+          { target: "all_drivers", ...payload },
+          (ack) => {
+            if (ack?.ok) alert("Đã gửi cho tất cả tài xế");
+          }
+        );
+      } else if (selectedRecipient === "specific") {
+        // Try to detect driver id first (from dropdown), otherwise treat as parent id
+        if (drivers.find((d) => d.id === specificRecipient)) {
+          socket.emit(
+            "manager-send-notification",
+            { target: "driver", driverId: specificRecipient, ...payload },
+            (ack) => {
+              if (ack?.ok) alert("Đã gửi cho tài xế");
+            }
+          );
+        } else {
+          socket.emit(
+            "manager-send-notification",
+            { target: "parent", parentId: specificRecipient, ...payload },
+            (ack) => {
+              if (ack?.ok) alert("Đã gửi cho phụ huynh");
+            }
+          );
+        }
+      }
+
+      console.log("Sent payload:", {
+        recipient: selectedRecipient,
+        specificRecipient,
+        ...payload,
+      });
+    } catch (err) {
+      console.error("Socket send error", err);
+      alert("Gửi thất bại, thử lại sau.");
+    }
 
     // Clear form
     setMessage("");
@@ -82,7 +137,7 @@ export default function ManagerMessages() {
     setSpecificRecipient("");
     setMessageType("info");
 
-    alert("Tin nhắn đã được gửi thành công!");
+    // keep existing confirmation minimal (socket callbacks above also notify)
   };
 
   const getMessageTypeColor = (type) => {
@@ -289,8 +344,8 @@ export default function ManagerMessages() {
                           {msg.type === "urgent"
                             ? "Khẩn cấp"
                             : msg.type === "reminder"
-                            ? "Nhắc nhở"
-                            : "Thông tin"}
+                              ? "Nhắc nhở"
+                              : "Thông tin"}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {formatTimestamp(msg.timestamp)}

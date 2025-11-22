@@ -1,311 +1,327 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
-import { LeafletMap } from "../map/LeafletMap";
 import { useIsMobile } from "../ui/use-mobile";
-import {
-  MapPin,
-  Navigation,
-  Bus,
-  Clock,
-  RefreshCw,
-  Bell,
-  Phone,
-  AlertTriangle,
-  CheckCircle,
-} from "lucide-react";
+import { LeafletMap } from "../map/LeafletMap";
+import { io } from "socket.io-client";
+import { getBusStopsByRouteId } from "../../service/driverService";
 
-export function ParentTracking({ children }) {
-  const [busLocation, setBusLocation] = useState({
-    lat: 10.8231,
-    lng: 106.6297,
-    speed: 32,
-    timestamp: new Date(),
-  });
+const GEOAPIFY_KEY = "2b833a5c3c1649d89c2e52d7976c7534";
 
-  const [isTracking, setIsTracking] = useState(true);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+export function ParentTracking({ studentInfo, routeInfo }) {
   const isMobile = useIsMobile();
 
-  // Mock real-time tracking
+  // ---- FIX ROUTE INFO + STUDENT INFO ----
+  const students = Array.isArray(studentInfo)
+    ? studentInfo
+    : studentInfo
+    ? [studentInfo]
+    : [];
+  const routes = Array.isArray(routeInfo)
+    ? routeInfo
+    : routeInfo
+    ? [routeInfo]
+    : [];
+  // Lấy danh sách ID
+  const routeIds = routes.map((r) => r.route?.id);
+  const studentIds = students.map((s) => s.id);
+
+  // Map studentId → routeId
+  const studentRouteMap = useMemo(() => {
+    const map = {};
+    routes.forEach((item) => {
+      if (item.studentId && item.route?.id) {
+        map[item.studentId] = item.route.id;
+      }
+    });
+    return map;
+  }, [routes]);
+
+  // ---------------------------------------
+
+  const [currentLocation, setCurrentLocation] = useState({
+    lat: 10.8231,
+    lng: 106.6297,
+  }); // mock GPS
+  const [otherBuses, setOtherBuses] = useState({});
+  const [busStops, setBusStops] = useState([]);
+
+  // Static & dynamic route
+  const [staticRouteCoords, setStaticRouteCoords] = useState([]);
+  const [driverToFirstStopCoords, setDriverToFirstStopCoords] = useState([]);
+
+  const [routeStatus, setRouteStatus] = useState("idle");
+
+  const isFetchingStatic = useRef(false);
+  const isFetchingDynamic = useRef(false);
+
+  const socket = useMemo(() => io("http://26.58.101.232:5000"), []);
+
+  // ---- FETCH BUS STOPS ----
   useEffect(() => {
-    if (!isTracking) return;
+    if (!routeIds || routeIds.length === 0) return;
 
-    const interval = setInterval(() => {
-      setBusLocation((prev) => ({
-        lat: prev.lat + (Math.random() - 0.5) * 0.0005,
-        lng: prev.lng + (Math.random() - 0.5) * 0.0005,
-        speed: Math.max(
-          0,
-          Math.min(50, prev.speed + (Math.random() - 0.5) * 8)
-        ),
-        timestamp: new Date(),
+    const fetchStops = async () => {
+      try {
+        const res = await getBusStopsByRouteId(routeIds);
+        if (res?.data?.EC === 0) {
+          const sorted = res.data.DT || [];
+          setBusStops(sorted);
+        }
+      } catch (e) {
+        console.error("Error loading bus stops", e);
+      }
+    };
+
+    fetchStops();
+  }, [routeIds]);
+
+  //----UPDATE CURRENT LOCATION----
+  useEffect(() => {
+    socket.on("bus-location-update", async (data) => {
+      try {
+        setCurrentLocation({
+          lat: data.latitude,
+          lng: data.longitude,
+        });
+      } catch (error) {
+        console.log(error);
+      }
+    });
+  });
+  // ---- GEOAPIFY FETCH ----
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const fetchSegment = async (a, b) => {
+    const url = `https://api.geoapify.com/v1/routing?waypoints=${a.lat},${a.lng}|${b.lat},${b.lng}&mode=bus&apiKey=${GEOAPIFY_KEY}`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return [];
+
+      const json = await res.json();
+      const geometry = json?.features?.[0]?.geometry;
+
+      if (!geometry?.coordinates) return [];
+
+      let coords = [];
+
+      if (geometry.type === "LineString") {
+        coords = geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
+      } else if (geometry.type === "MultiLineString") {
+        coords = geometry.coordinates.flatMap((line) =>
+          line.map(([lng, lat]) => ({ lat, lng }))
+        );
+      }
+
+      return coords.filter(Boolean);
+    } catch {
+      return [];
+    }
+  };
+
+  // ---- STATIC ROUTE (BUS ROUTE) ----
+  useEffect(() => {
+    const build = async () => {
+      if (busStops.length < 2 || isFetchingStatic.current) return;
+      if (staticRouteCoords.length > 0) return;
+
+      isFetchingStatic.current = true;
+      setRouteStatus("Đang vẽ tuyến cố định...");
+
+      const stops = busStops.map((s) => ({
+        lat: Number(s.latitude),
+        lng: Number(s.longitude),
       }));
-    }, 3000);
 
-    return () => clearInterval(interval);
-  }, [isTracking]);
+      let all = [];
 
-  const child = Array.isArray(children) ? children[0] : children;
-  if (!child) {
-    return (
-      <div className="text-center p-4">
-        ⚠️ Không có dữ liệu học sinh để theo dõi.
-      </div>
-    );
-  }
+      for (let i = 0; i < stops.length - 1; i++) {
+        await sleep(200);
+        const seg = await fetchSegment(stops[i], stops[i + 1]);
+        if (seg.length > 0) {
+          all = all.length > 0 ? [...all, ...seg.slice(1)] : [...seg];
+        } else {
+          all.push(stops[i], stops[i + 1]);
+        }
+      }
 
-  const busInfo = {
-    vehicle: child.vehicle || "51B-12345",
-    driver: child.driver || "Nguyễn Văn A",
-    route: child.route || "Tuyến 01",
-    status: "on_route",
-    nextStop: "Chợ Thủ Đức",
-    estimatedArrival: "12 phút",
-    distanceToChild: 2.8,
-    studentsOnBoard: 28,
-  };
+      setStaticRouteCoords(all);
+      setRouteStatus("Đã tải xong.");
+      isFetchingStatic.current = false;
+    };
 
-  const upcomingStops = [
-    { name: "Ngã tư Hàng Xanh", status: "passed", time: "07:10", distance: 0 },
-    { name: "Cầu Sài Gòn", status: "current", time: "07:22", distance: 1.2 },
-    { name: "Chợ Thủ Đức", status: "upcoming", time: "07:35", distance: 3.5 },
-    {
-      name: "Điểm đón con em",
-      status: "upcoming",
-      time: "07:45",
-      distance: 5.2,
-    },
-  ];
+    build();
+  }, [busStops]);
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case "on_route":
-        return (
-          <Badge className="bg-green-100 text-green-800">Đang di chuyển</Badge>
-        );
-      case "at_stop":
-        return (
-          <Badge className="bg-blue-100 text-blue-800">Tại điểm dừng</Badge>
-        );
-      case "delayed":
-        return <Badge className="bg-red-100 text-red-800">Bị trễ</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
+  // ---- DYNAMIC ROUTE (driver → first stop) ----
+  useEffect(() => {
+    const build = async () => {
+      if (
+        !currentLocation ||
+        busStops.length === 0 ||
+        isFetchingDynamic.current
+      )
+        return;
 
-  const getStopIcon = (status) => {
-    switch (status) {
-      case "passed":
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case "current":
-        return <Navigation className="w-4 h-4 text-blue-600" />;
-      case "upcoming":
-        return <Clock className="w-4 h-4 text-gray-400" />;
-      default:
-        return <MapPin className="w-4 h-4 text-gray-400" />;
-    }
-  };
+      isFetchingDynamic.current = true;
 
-  const formatLastUpdate = (date) => {
-    const now = new Date();
-    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-    if (diff < 60) return `${diff} giây trước`;
-    if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
-    return `${Math.floor(diff / 3600)} giờ trước`;
-  };
+      const firstStop = {
+        lat: Number(busStops[0].latitude),
+        lng: Number(busStops[0].longitude),
+      };
 
-  // ✅ Dữ liệu routes an toàn
-  const routes = [
-    {
-      id: "bus-route",
-      path: [
-        busLocation,
-        { lat: busLocation.lat + 0.005, lng: busLocation.lng + 0.005 },
-        { lat: busLocation.lat + 0.01, lng: busLocation.lng + 0.01 },
-        { lat: busLocation.lat + 0.015, lng: busLocation.lng + 0.015 },
-        { lat: busLocation.lat + 0.02, lng: busLocation.lng + 0.02 },
-      ],
-      color: "#3b82f6",
-      strokeWeight: 4,
-      title: busInfo.route,
-    },
-  ];
+      const seg = await fetchSegment(currentLocation, firstStop);
 
+      setDriverToFirstStopCoords(
+        seg.length > 0 ? seg : [currentLocation, firstStop]
+      );
+
+      isFetchingDynamic.current = false;
+    };
+
+    build();
+  }, [currentLocation, busStops]);
+
+  // ---- COMBINE POLYLINES ----
+  const polylines = useMemo(() => {
+    const lines = [];
+
+    if (driverToFirstStopCoords.length > 0)
+      lines.push({
+        id: "driver-to-stop",
+        positions: driverToFirstStopCoords,
+        color: "#3b82f6",
+        weight: 6,
+        dashArray: "10,10",
+      });
+
+    if (staticRouteCoords.length > 0)
+      lines.push({
+        id: "static-route",
+        positions: staticRouteCoords,
+        color: "#28a745",
+        weight: 4,
+        opacity: 0.6,
+      });
+
+    return lines;
+  }, [driverToFirstStopCoords, staticRouteCoords]);
+
+  // ---- MARKERS ----
+  const mapMarkers = useMemo(() => {
+    return [
+      {
+        id: "current-vehicle",
+        position: currentLocation,
+        title: "Xe của bạn",
+        type: "bus-current",
+        draggable: true,
+        onDrag: (pos) => setCurrentLocation(pos),
+      },
+      ...busStops.map((stop, idx) => ({
+        id: `stop-${stop.id || idx}`,
+        position: { lat: stop.latitude, lng: stop.longitude },
+        title: `${idx + 1}. ${stop.name}`,
+        type: "stop",
+      })),
+    ];
+  }, [currentLocation, busStops]);
+
+  // ---- RENDER ----
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="w-5 h-5" />
-              Theo dõi xe buýt - {child.name || "Học sinh"}
-              {getStatusBadge(busInfo.status)}
-            </CardTitle>
-
-            <div className="flex gap-2">
-              <Button
-                variant={notificationsEnabled ? "default" : "outline"}
-                size="sm"
-                onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-              >
-                <Bell className="w-4 h-4 mr-2" />
-                {notificationsEnabled ? "Tắt thông báo" : "Bật thông báo"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsTracking(!isTracking)}
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                {isTracking ? "Tạm dừng" : "Tiếp tục"}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-
       <div
         className={`grid ${isMobile ? "grid-cols-1" : "lg:grid-cols-3"} gap-6`}
       >
-        {/* Map View */}
         <div className="lg:col-span-2">
+          <div className="mb-2 text-sm text-gray-600 flex justify-between">
+            <span>
+              <strong>Trạng thái:</strong> {routeStatus}
+            </span>
+            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+              GPS OK
+            </span>
+          </div>
+
           <LeafletMap
-            height={isMobile ? "300px" : "400px"}
-            center={busLocation || { lat: 10.762622, lng: 106.660172 }}
-            zoom={14}
-            markers={[
-              {
-                id: "current-bus",
-                position: busLocation,
-                title: `Xe ${busInfo.vehicle}`,
-                type: "bus",
-                status: "active",
-                info: `
-                  <div class="min-w-[200px]">
-                    <div class="font-medium text-lg mb-2">Xe ${
-                      busInfo.vehicle
-                    }</div>
-                    <div class="space-y-1 text-sm">
-                      <div><strong>Tài xế:</strong> ${busInfo.driver}</div>
-                      <div><strong>Tốc độ:</strong> ${Math.round(
-                        busLocation.speed
-                      )} km/h</div>
-                      <div><strong>Học sinh:</strong> ${
-                        busInfo.studentsOnBoard
-                      } em</div>
-                      <div><strong>Trạm tiếp theo:</strong> ${
-                        busInfo.nextStop
-                      }</div>
-                      <div><strong>Dự kiến đến:</strong> ${
-                        busInfo.estimatedArrival
-                      }</div>
-                    </div>
-                  </div>
-                `,
-              },
-              ...upcomingStops.map((stop, index) => ({
-                id: `stop-${index}`,
-                position: {
-                  lat: busLocation.lat + index * 0.005,
-                  lng: busLocation.lng + index * 0.005,
-                },
-                title: stop.name,
-                type: stop.name.includes("con em") ? "home" : "stop",
-                status: stop.status === "passed" ? "active" : "inactive",
-                info: `
-                  <div class="min-w-[150px]">
-                    <div class="font-medium text-lg mb-2">${stop.name}</div>
-                    <div class="space-y-1 text-sm">
-                      <div><strong>Thời gian:</strong> ${stop.time}</div>
-                      <div><strong>Khoảng cách:</strong> ${
-                        stop.distance
-                      } km</div>
-                      <div><strong>Trạng thái:</strong> ${
-                        stop.status === "passed"
-                          ? "Đã qua"
-                          : stop.status === "current"
-                          ? "Hiện tại"
-                          : "Sắp tới"
-                      }</div>
-                    </div>
-                  </div>
-                `,
-              })),
-            ]}
-            routes={routes}
-            showTraffic={true}
-            showControls={true}
+            height={isMobile ? "400px" : "600px"}
+            center={currentLocation}
+            zoom={15}
+            markers={mapMarkers}
+            polylines={polylines}
+            className="w-full rounded-lg shadow-md border"
           />
         </div>
 
-        {/* Side Panel */}
-        <div className="space-y-6">
-          {/* Lộ trình */}
+        {/* SIDEBAR TRẠM */}
+        {/* <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Lộ trình</CardTitle>
+              <CardTitle>Lộ trình ({busStops.length} trạm)</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {upcomingStops.map((stop, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-center gap-3 p-3 rounded-lg ${
-                      stop.status === "current"
-                        ? "bg-blue-50 border border-blue-200"
-                        : "bg-gray-50"
-                    }`}
-                  >
-                    {getStopIcon(stop.status)}
-                    <div className="flex-1">
-                      <p
-                        className={`font-medium ${
-                          stop.status === "current" ? "text-blue-800" : ""
-                        }`}
-                      >
-                        {stop.name}
+            <CardContent className="max-h-[600px] overflow-y-auto">
+              {busStops.length === 0 && (
+                <p className="text-sm text-center text-gray-500 py-4">
+                  Chưa có dữ liệu trạm.
+                </p>
+              )}
+
+              {busStops.map((stop, index) => (
+                <div
+                  key={stop.id || index}
+                  className="border-l-2 border-gray-200 pl-4 pb-6"
+                >
+                  <div className="bg-white p-3 rounded-lg shadow-sm border">
+                    <div className="flex justify-between">
+                      <p className="font-semibold text-sm">
+                        Trạm {index + 1}: {stop.name}
                       </p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="w-3 h-3" />
-                        <span>{stop.time}</span>
-                        {stop.distance > 0 && (
-                          <>
-                            <span>•</span>
-                            <span>{stop.distance} km</span>
-                          </>
-                        )}
-                      </div>
+                      <Badge variant="outline" className="text-[10px]">
+                        Điểm dừng
+                      </Badge>
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {stop.address || "Đang cập nhật địa chỉ"}
+                    </p>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
-
-          {/* Hành động nhanh */}
+           */}
+        <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Hành động nhanh</CardTitle>
+              <CardTitle>Các điểm đón/trả</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <Button className="w-full justify-start" variant="outline">
-                <Phone className="w-4 h-4 mr-2" />
-                Gọi điện cho tài xế
-              </Button>
+            <CardContent className="max-h-[600px] overflow-y-auto space-y-4">
+              {studentInfo.length === 0 && (
+                <p className="text-sm text-center text-gray-500 py-4">
+                  Chưa có dữ liệu học sinh
+                </p>
+              )}
 
-              <Button className="w-full justify-start" variant="outline">
-                <Bell className="w-4 h-4 mr-2" />
-                Nhắc nhở đón con
-              </Button>
-
-              <Button className="w-full justify-start" variant="outline">
-                <AlertTriangle className="w-4 h-4 mr-2" />
-                Báo cáo sự cố
-              </Button>
+              {studentInfo.map((student, index) => (
+                <div
+                  key={student.id || index}
+                  className="border-l-2 border-gray-200 pl-4 pb-4"
+                >
+                  <div className="bg-white p-3 rounded-lg shadow-sm border space-y-1">
+                    <p className="font-semibold text-sm">
+                      Họ và tên: {student.name}
+                    </p>
+                    <div className="flex justify-between text-sm text-gray-700">
+                      <span>
+                        Điểm đón: {student.pickup_point.name || "Đang cập nhật"}
+                      </span>
+                      <span>
+                        Điểm trả:{" "}
+                        {student.dropoff_point.name || "Đang cập nhật"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </div>

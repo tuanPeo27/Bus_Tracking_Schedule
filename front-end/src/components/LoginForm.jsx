@@ -49,7 +49,6 @@ export function LoginForm({ onLogin }) {
 
     try {
       const res = await userLogin({ username, password });
-      console.log(res.data.DT);
 
       if (res && res.data.EC === 0) {
         const account = res.data.DT.user;
@@ -82,8 +81,9 @@ export function LoginForm({ onLogin }) {
     } catch (err) {
       console.error(err);
       showError(
-        "Lỗi kết nối",
-        "Không thể kết nối đến máy chủ. Vui lòng thử lại sau."
+        "Đăng nhập thất bại",
+        err?.response?.data?.EM ||
+          "Không thể kết nối đến máy chủ. Vui lòng thử lại sau."
       );
     } finally {
       setIsLoading(false);
