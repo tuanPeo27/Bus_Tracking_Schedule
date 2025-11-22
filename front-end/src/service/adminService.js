@@ -61,6 +61,14 @@ const createSchedule = async (data) => {
     return instance.post(`schedules/create`, data);
 }
 
+const createRoute = async (data) => {
+    return instance.post(`routes/create`, data);
+}
+
+const createBusStop = async (data) => {
+    return instance.post(`busstops/create`, data);
+}
+
 const createStudent = async (data) => {
     return instance.post(`students/create`, data);
 }
@@ -89,6 +97,14 @@ const updateBus = async (data, idBus) => {
     return instance.put(`buses/edit/${idBus}`, data)
 }
 
+const updateRoute = async (data, idRoute) => {
+    return instance.put(`routes/edit/${idRoute}`, data)
+}
+
+const updateBusStop = async (data, idBusStop) => {
+    return instance.put(`busstops/edit/${idBusStop}`, data)
+}
+
 const updateParent = async (data, idParent) => {
     return instance.put(`parents/edit/${idParent}`, data)
 }
@@ -109,11 +125,30 @@ const deleteParent = async (idParent) => {
     return instance.delete(`parents/delete/${idParent}`);
 }
 
+const deleteBusStop = async (idBusStop) => {
+    return instance.delete(`busstops/delete/${idBusStop}`);
+}
+
 const createParent = async (data) => {
     return instance.post(`parents/create`, data);
 }
 
+const getBusStopByRouteId = async (idRoute) => {
+    return instance.get(`busstops/route/${idRoute}`)
+}
+
+const deleteRoute = async (idRoute) => {
+    return instance.delete(`routes/delete/${idRoute}`);
+}
+
 export {
+    deleteRoute,
+    updateRoute,
+    updateBusStop,
+    deleteBusStop,
+    createBusStop,
+    createRoute,
+    getBusStopByRouteId,
     updateParent,
     createParent,
     deleteParent,

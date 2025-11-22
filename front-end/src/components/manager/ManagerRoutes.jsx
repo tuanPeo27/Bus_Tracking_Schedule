@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -49,14 +49,125 @@ import {
   Save,
   X,
   Eye,
+  MapPin
 } from "lucide-react";
+import { LeafletMap } from "../map/LeafletMap";
+import { getAllRoute, getBusStopByRouteId, createRoute, createBusStop, updateRoute, updateBusStop, deleteBusStop, deleteRoute, getAllSchedule } from "../../service/adminService";
 
-export default function ManagerVehicles() {
+export default function ManagerRoutes() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [showMap, setShowMap] = useState(false);
+  const [stopPoints, setStopPoints] = useState([]); // array: {lat, lng}
+  const [allRoute, setAllRoute] = useState([]);
+  const [newRoute, setNewRoute] = useState({
+    id: "",
+    name: "",
+    start_point: "",
+    end_point: "",
+  });
+  const [allBusStop, setAllBusStop] = useState([]);
+  const getAllRoutes = async () => {
+    try {
+      const res = await getAllRoute();
+      const dataRoute = Array.isArray(res.data) ? res.data : res.data?.DT || [];
+      if (res?.data?.EC === 0) {
+        const getInfoRoute = await Promise.all(
+          dataRoute.map(async (item) => {
+            const busStopInfo = await getBusStopByRouteId(item.id);
+            return { ...item, busStopInfo };
+          })
+        );
+        setAllRoute(getInfoRoute);
+        console.log(getInfoRoute);
+      } else {
+        setAllRoute([]);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách tuyến đường:", error);
+      setAllRoute([]);
+    }
+  };
+  const handleMapClick = (pt) => {
+    setStopPoints((prev) => [
+      ...prev,
+      {
+        lat: pt.lat,
+        lng: pt.lng,
+        name: `Trạm ${prev.length + 1}`,
+        order_index: prev.length + 1,
+      },
+    ]);
+  };
+
+  const handleAddRoute = async () => {
+    if (!newRoute.name || !newRoute.start_point || !newRoute.end_point) {
+      showError("Lỗi", "Vui lòng điền đầy đủ thông tin!");
+      return;
+    }
+    if (!stopPoints || stopPoints.length === 0) {
+      showError("Lỗi", "Vui lòng chọn ít nhất 1 điểm dừng trên bản đồ!");
+      return;
+    }
+
+    try {
+      // 1) Tạo route
+      const res = await createRoute({
+        name: newRoute.name,
+        start_point: newRoute.start_point,
+        end_point: newRoute.end_point,
+      });
+
+      const resData = res?.data || {};
+      // tìm id theo các cấu trúc trả về phổ biến
+      const createdRoute =
+        resData?.DT || resData || {};
+      const routeId = createdRoute?.id || createdRoute?.route?.id || createdRoute?.DT?.id;
+
+      if (!routeId) {
+        showError("Lỗi", "Không lấy được id tuyến sau khi tạo.");
+        return;
+      }
+
+      // 2) Tạo từng bus stop (gọi API createBusStop)
+      const stopPromises = stopPoints.map((s, idx) =>
+        createBusStop({
+          route_id: routeId,
+          name: s.name || `Trạm ${idx + 1}`,
+          latitude: String(s.lat),
+          longitude: String(s.lng),
+          order_index: s.order_index || idx + 1,
+        }).catch((err) => ({ __error: err }))
+      );
+
+      const results = await Promise.all(stopPromises);
+      const failed = results.filter((r) => r && r.__error);
+
+      if (failed.length > 0) {
+        showError("Cảnh báo", `Tạo tuyến thành công nhưng ${failed.length} điểm dừng không lưu được.`);
+      } else {
+        showSuccess("Thành công", "Đã tạo tuyến và tất cả điểm dừng.");
+      }
+
+      // reset và reload
+      setNewRoute({ id: "", name: "", start_point: "", end_point: "" });
+      setStopPoints([]);
+      setIsAddDialogOpen(false);
+      await getAllRoutes();
+    } catch (error) {
+      console.error("handleAddRoute error:", error);
+      showError("Lỗi", error?.message || "Không thể tạo tuyến.");
+    }
+  }
+
+  useEffect(() => {
+    getAllRoutes();
+
+  }, [])
+
   const [vehicles, setVehicles] = useState([
     {
       id: "XE001",
@@ -191,12 +302,14 @@ export default function ManagerVehicles() {
     return daysUntil <= 7;
   };
 
-  const filteredVehicles = vehicles.filter(
-    (vehicle) =>
-      vehicle.licensePlate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.assignedDriver?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRoutes = allRoute.filter((route) => {
+    const matchesSearch =
+      route.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      route.start_point.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      route.end_point.toLowerCase().includes(searchTerm.toLowerCase());
+
+    return matchesSearch;
+  });
 
   const stats = {
     total: vehicles.length,
@@ -205,60 +318,9 @@ export default function ManagerVehicles() {
     breakdown: vehicles.filter((v) => v.status === "breakdown").length,
   };
 
-  const handleEditVehicle = (vehicle) => {
-    setSelectedVehicle(vehicle);
-    setIsEditDialogOpen(true);
-  };
 
-  const handleViewDetails = (vehicle) => {
-    setSelectedVehicle(vehicle);
-    setIsDetailDialogOpen(true);
-  };
 
-  // CRUD Functions
-  const handleAddVehicle = () => {
-    if (
-      !newVehicle.licensePlate ||
-      !newVehicle.brand ||
-      !newVehicle.model ||
-      !newVehicle.seats
-    ) {
-      showError("Lỗi", "Vui lòng điền đầy đủ thông tin!");
-      return;
-    }
 
-    const vehicle = {
-      id: `XE${String(vehicles.length + 1).padStart(3, "0")}`,
-      licensePlate: newVehicle.licensePlate,
-      brand: newVehicle.brand,
-      model: newVehicle.model,
-      seats: parseInt(newVehicle.seats),
-      avgSpeed: 30,
-      status: newVehicle.status,
-      assignedDriver: null,
-      currentRoute: null,
-      fuelLevel: 100,
-      mileage: 0,
-      lastMaintenance: new Date().toISOString().split("T")[0],
-      nextMaintenance: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
-      totalTrips: 0,
-      condition: newVehicle.condition,
-    };
-
-    setVehicles((prev) => [...prev, vehicle]);
-    setNewVehicle({
-      licensePlate: "",
-      brand: "",
-      model: "",
-      seats: "",
-      status: "active",
-      condition: "good",
-    });
-    setIsAddDialogOpen(false);
-    showSuccess("Thành công", `Đã thêm xe ${vehicle.licensePlate}!`);
-  };
 
   const handleUpdateVehicle = () => {
     if (!selectedVehicle) return;
@@ -292,10 +354,207 @@ export default function ManagerVehicles() {
     setTimeout(() => setSelectedVehicleId(null), 2000); // Remove highlight after 2 seconds
   };
 
+  // STATE và hàm cho Edit Route
+  const [isRouteEditOpen, setIsRouteEditOpen] = useState(false);
+  const [routeEdit, setRouteEdit] = useState(null); // { id, name, start_point, end_point }
+  const [editStopPoints, setEditStopPoints] = useState([]); // array: { id?, lat, lng, name, order_index }
+  const [removedStopIds, setRemovedStopIds] = useState([]); // ids to delete on save
+
+  // Delete dialog state (mirror ManagerParent)
+  const [isDeleteRouteDialogOpen, setIsDeleteRouteDialogOpen] = useState(false);
+  const [routeToDelete, setRouteToDelete] = useState(null);
+
+  // helper: lấy mảng stops từ route.busStopInfo (tùy cấu trúc response)
+  const extractStops = (busStopInfo) => {
+    const maybe = busStopInfo?.data?.DT || busStopInfo?.data || busStopInfo?.DT || busStopInfo;
+    return Array.isArray(maybe) ? maybe : [];
+  };
+
+  const openRouteEditor = (route) => {
+    // populate route fields
+    setRouteEdit({
+      id: route.id,
+      name: route.name || "",
+      start_point: route.start_point || "",
+      end_point: route.end_point || "",
+    });
+
+    // map existing stops -> editStopPoints
+    const rawStops = extractStops(route.busStopInfo);
+    const mapped = (rawStops || []).map((s, i) => ({
+      id: s.id || s.ID || s.bus_stop_id || null,
+      lat: Number(s.latitude || s.lat),
+      lng: Number(s.longitude || s.lng),
+      name: s.name || `Trạm ${i + 1}`,
+      order_index: s.order_index || i + 1,
+    }));
+    setEditStopPoints(mapped);
+    setRemovedStopIds([]);
+    setIsRouteEditOpen(true);
+  };
+
+  // map click trong edit dialog -> thêm điểm dừng mới
+  const handleEditMapClick = (pt) => {
+    setEditStopPoints((prev) => [
+      ...prev,
+      { lat: pt.lat, lng: pt.lng, name: `Trạm ${prev.length + 1}`, order_index: prev.length + 1 },
+    ]);
+  };
+
+
+
+  // xóa điểm dừng trong edit dialog
+  const handleRemoveEditStop = (index) => {
+    setEditStopPoints((prev) => {
+      const removed = prev[index];
+      if (removed && removed.id) setRemovedStopIds((r) => [...r, removed.id]);
+      return prev.filter((_, i) => i !== index).map((s, i) => ({ ...s, order_index: i + 1 }));
+    });
+  };
+
+  // Lưu thay đổi tuyến + stops lên backend
+  const handleSaveEditedRoute = async () => {
+    if (!routeEdit || !routeEdit.id) {
+      showError("Lỗi", "Không có tuyến để cập nhật.");
+      return;
+    }
+    if (!routeEdit.name || !routeEdit.start_point || !routeEdit.end_point) {
+      showError("Lỗi", "Vui lòng điền đầy đủ thông tin tuyến.");
+      return;
+    }
+
+    try {
+      // 1) cập nhật route
+      // sử dụng service updateRoute
+      const updRouteRes = await updateRoute(
+        {
+          name: routeEdit.name,
+          start_point: routeEdit.start_point,
+          end_point: routeEdit.end_point,
+        },
+        routeEdit.id
+      );
+      const updData = updRouteRes?.data || updRouteRes || {};
+      if (!((updData?.EC !== undefined && updData.EC === 0) || updRouteRes?.status === 200 || updRouteRes?.ok)) {
+        throw new Error(updData?.EM || `Cập nhật tuyến thất bại`);
+      }
+
+      // 2) xử lý stops: update tồn tại, tạo mới, xóa đã đánh dấu
+      const stopPromises = [];
+
+      editStopPoints.forEach((s, idx) => {
+        const body = {
+          name: s.name,
+          latitude: String(s.lat),
+          longitude: String(s.lng),
+          order_index: s.order_index || idx + 1,
+        };
+        if (s.id) {
+          // update existing using adminService.updateBusStop
+          stopPromises.push(
+            updateBusStop(body, s.id).catch((err) => Promise.reject(err))
+          );
+        } else {
+          // create new using adminService.createBusStop
+          stopPromises.push(createBusStop({ route_id: routeEdit.id, ...body }).catch((err) => Promise.reject(err)));
+        }
+      });
+
+      // xóa các stop đã bị remove (sử dụng adminService.deleteBusStop)
+      removedStopIds.forEach((id) => {
+        stopPromises.push(deleteBusStop(id).catch((err) => Promise.reject(err)));
+      });
+
+      const results = await Promise.allSettled(stopPromises);
+      const rejected = results.filter((r) => r.status === "rejected");
+      if (rejected.length > 0) {
+        console.warn("Một số thao tác điểm dừng lỗi:", rejected);
+        showError("Cảnh báo", "Cập nhật tuyến xong nhưng một số điểm dừng không cập nhật được.");
+      } else {
+        showSuccess("Thành công", "Đã cập nhật tuyến và điểm dừng.");
+      }
+
+      setIsRouteEditOpen(false);
+      setRouteEdit(null);
+      setEditStopPoints([]);
+      setRemovedStopIds([]);
+      await getAllRoutes();
+    } catch (err) {
+      console.error("Lỗi khi lưu cập nhật tuyến:", err);
+      showError("Lỗi", err?.message || "Không thể lưu thay đổi tuyến.");
+    }
+  };
+
+  // Mở dialog xóa (sẽ hiện dialog confirm)
+  const openDeleteRouteDialog = (route) => {
+    setRouteToDelete(route);
+    setIsDeleteRouteDialogOpen(true);
+  };
+
+  // Thực hiện xóa sau khi người dùng xác nhận trong dialog
+  const confirmDeleteRoute = async () => {
+    if (!routeToDelete || !routeToDelete.id) {
+      showError("Lỗi", "Không có tuyến để xóa.");
+      setIsDeleteRouteDialogOpen(false);
+      setRouteToDelete(null);
+      return;
+    }
+
+    try {
+      // --- NEW: kiểm tra xem có lịch trình tham chiếu tới route này không ---
+      const schedulesRes = await getAllSchedule();
+      const schedulesData = Array.isArray(schedulesRes?.data) ? schedulesRes.data : (schedulesRes?.data?.DT || []);
+      const referencing = (schedulesData || []).filter((s) => String(s.route_id) === String(routeToDelete.id));
+      if (referencing.length > 0) {
+        showError("Không thể xóa", `Tuyến đang có ${referencing.length} lịch trình liên quan. Vui lòng xóa hoặc chuyển các lịch trình đó trước khi xóa tuyến.`);
+        setIsDeleteRouteDialogOpen(false);
+        setRouteToDelete(null);
+        return;
+      }
+
+      const routeId = routeToDelete.id;
+      // 1) Lấy danh sách điểm dừng của tuyến
+      const stopsRes = await getBusStopByRouteId(routeId);
+      const stops = (stopsRes?.data?.DT) || (stopsRes?.data) || [];
+
+      // 2) Xóa tất cả điểm dừng (song song)
+      const deleteStopPromises = (stops || []).map((s) => {
+        const id = s.id || s.ID || s.bus_stop_id;
+        if (!id) return Promise.resolve({ skipped: true });
+        return deleteBusStop(id).catch((err) => ({ __error: err, id }));
+      });
+      const stopResults = await Promise.allSettled(deleteStopPromises);
+      const stopFailed = stopResults.filter(r => r.status === "rejected" || (r.value && r.value.__error));
+
+      // 3) Xóa route
+      const delRouteRes = await deleteRoute(routeId);
+      const delData = delRouteRes?.data || delRouteRes || {};
+      const routeDeleted = (delData?.EC !== undefined && delData.EC === 0) || delRouteRes?.status === 200 || delRouteRes?.ok;
+
+      if (!routeDeleted) {
+        console.warn("delete route response:", delRouteRes);
+        showError("Lỗi", "Không xóa được tuyến. Vui lòng thử lại.");
+      } else {
+        if (stopFailed.length > 0) {
+          showError("Cảnh báo", `Đã xóa tuyến nhưng ${stopFailed.length} điểm dừng không xóa được.`);
+        } else {
+          showSuccess("Thành công", "Đã xóa tuyến và các điểm dừng liên quan.");
+        }
+        await getAllRoutes();
+      }
+    } catch (err) {
+      console.error("Lỗi khi xóa tuyến:", err);
+      showError("Lỗi", err?.message || "Xảy ra lỗi khi xóa tuyến.");
+    } finally {
+      setIsDeleteRouteDialogOpen(false);
+      setRouteToDelete(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid md:grid-cols-1 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -303,54 +562,13 @@ export default function ManagerVehicles() {
                 <Bus className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Tổng xe buýt</p>
-                <p className="font-semibold">{stats.total}</p>
+                <p className="text-sm text-muted-foreground">Tổng tuyến đường</p>
+                <p className="font-semibold">{allRoute?.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Đang hoạt động</p>
-                <p className="font-semibold">{stats.active}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Wrench className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Đang bảo trì</p>
-                <p className="font-semibold">{stats.maintenance}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Hỏng hóc</p>
-                <p className="font-semibold">{stats.breakdown}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Header */}
@@ -359,7 +577,7 @@ export default function ManagerVehicles() {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Bus className="w-5 h-5" />
-              Quản lý Xe buýt
+              Quản lý Tuyến đường
             </CardTitle>
 
             <Button
@@ -367,7 +585,7 @@ export default function ManagerVehicles() {
               onClick={() => setIsAddDialogOpen(true)}
             >
               <Plus className="w-4 h-4 mr-2" />
-              Thêm xe buýt
+              Thêm tuyến đường
             </Button>
           </div>
         </CardHeader>
@@ -375,7 +593,7 @@ export default function ManagerVehicles() {
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Tìm kiếm theo biển số, hãng xe, tài xế..."
+              placeholder="Tìm kiếm theo tên tuyến, điểm bắt đầu, điểm kết thúc..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -390,135 +608,58 @@ export default function ManagerVehicles() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Thông tin xe</TableHead>
-                <TableHead>Phân công</TableHead>
-                <TableHead>Hiệu suất</TableHead>
-                <TableHead>Nhiên liệu</TableHead>
-                <TableHead>Bảo trì</TableHead>
-                <TableHead>Tình trạng</TableHead>
-                <TableHead>Trạng thái</TableHead>
+                <TableHead>Mã tuyến</TableHead>
+                <TableHead>Tên tuyến</TableHead>
+                <TableHead>Điểm bắt đầu</TableHead>
+                <TableHead>Điểm kết thúc</TableHead>
+                <TableHead>Điểm dừng</TableHead>
                 <TableHead>Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredVehicles.map((vehicle) => (
+              {filteredRoutes.map((route) => (
                 <TableRow
-                  key={vehicle.id}
-                  className={`cursor-pointer transition-colors ${selectedVehicleId === vehicle.id
-                      ? "bg-blue-50 border-l-4 border-blue-500"
-                      : ""
+                  key={route.id}
+                  className={`cursor-pointer transition-colors ${selectedVehicleId === route.id
+                    ? "bg-blue-50 border-l-4 border-blue-500"
+                    : ""
                     }`}
-                  onClick={() => handleRowClick(vehicle.id)}
+                  onClick={() => handleRowClick(route.id)}
                 >
                   <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Bus className="w-4 h-4" />
-                        <span className="font-medium">
-                          {vehicle.licensePlate}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {vehicle.brand} {vehicle.model}
-                      </p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Users className="w-3 h-3" />
-                        <span>{vehicle.seats} chỗ</span>
-                        <Gauge className="w-3 h-3 ml-2" />
-                        <span>{vehicle.avgSpeed} km/h</span>
-                      </div>
+                    <div>
+                      <p className="font-medium">{route?.id}</p>
+
                     </div>
                   </TableCell>
 
                   <TableCell>
-                    {vehicle.assignedDriver && vehicle.currentRoute ? (
-                      <div className="space-y-1">
-                        <p className="font-medium">{vehicle.assignedDriver}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {vehicle.currentRoute}
-                        </p>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        Chưa phân công
-                      </span>
-                    )}
-                  </TableCell>
+                    <div>
+                      <p className="font-medium">{route?.name}</p>
 
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="text-sm">
-                        <span className="font-medium">
-                          {vehicle.totalTrips.toLocaleString()}
-                        </span>{" "}
-                        chuyến
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {vehicle.mileage.toLocaleString()} km
-                      </div>
                     </div>
                   </TableCell>
 
                   <TableCell>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Nhiên liệu</span>
-                        <span className="font-medium">
-                          {vehicle.fuelLevel}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${getFuelLevelColor(
-                            vehicle.fuelLevel
-                          )}`}
-                          style={{ width: `${vehicle.fuelLevel}%` }}
-                        />
-                      </div>
+                    <div>
+                      <p className="font-medium">{route?.start_point}</p>
+
                     </div>
                   </TableCell>
 
                   <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="w-3 h-3" />
-                        <span>
-                          Cuối:{" "}
-                          {new Date(vehicle.lastMaintenance).toLocaleDateString(
-                            "vi-VN"
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="w-3 h-3" />
-                        <span
-                          className={
-                            isMaintenanceDue(vehicle.nextMaintenance)
-                              ? "text-red-600 font-medium"
-                              : ""
-                          }
-                        >
-                          Tiếp:{" "}
-                          {new Date(vehicle.nextMaintenance).toLocaleDateString(
-                            "vi-VN"
-                          )}
-                        </span>
-                      </div>
-                      {isMaintenanceDue(vehicle.nextMaintenance) && (
-                        <div className="flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-red-500" />
-                          <span className="text-xs text-red-600">
-                            Sắp đến hạn!
-                          </span>
-                        </div>
-                      )}
+                    <div>
+                      <p className="font-medium">{route?.end_point}</p>
+
                     </div>
                   </TableCell>
 
-                  <TableCell>{getConditionBadge(vehicle.condition)}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{route?.busStopInfo?.data?.DT["length"]}</p>
 
-                  <TableCell>{getStatusBadge(vehicle.status)}</TableCell>
-
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Button
@@ -526,17 +667,7 @@ export default function ManagerVehicles() {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleViewDetails(vehicle);
-                        }}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditVehicle(vehicle);
+                          openRouteEditor(route);
                         }}
                       >
                         <Edit className="w-4 h-4" />
@@ -546,7 +677,7 @@ export default function ManagerVehicles() {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteVehicle(vehicle.id);
+                          openDeleteRouteDialog(route);
                         }}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -561,76 +692,27 @@ export default function ManagerVehicles() {
       </Card>
 
       {/* Maintenance Alerts */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5" />
-            Cảnh báo bảo trì
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {vehicles
-              .filter((v) => isMaintenanceDue(v.nextMaintenance))
-              .map((vehicle) => (
-                <div
-                  key={vehicle.id}
-                  className="flex items-center gap-4 p-4 bg-red-50 border border-red-200 rounded-lg"
-                >
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
-                  <div className="flex-1">
-                    <p className="font-medium">
-                      Xe {vehicle.licensePlate} sắp đến hạn bảo trì
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Ngày bảo trì tiếp theo:{" "}
-                      {new Date(vehicle.nextMaintenance).toLocaleDateString(
-                        "vi-VN"
-                      )}
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Lên lịch bảo trì
-                  </Button>
-                </div>
-              ))}
-
-            {vehicles.filter((v) => isMaintenanceDue(v.nextMaintenance))
-              .length === 0 && (
-                <div className="text-center py-8">
-                  <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-600" />
-                  <h3 className="font-medium mb-2">
-                    Tất cả xe đều trong tình trạng tốt
-                  </h3>
-                  <p className="text-muted-foreground">
-                    Không có xe nào cần bảo trì trong thời gian tới.
-                  </p>
-                </div>
-              )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Add Vehicle Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Thêm xe buýt mới</DialogTitle>
+            <DialogTitle>Thêm tuyến đường mới</DialogTitle>
             <DialogDescription>
-              Điền thông tin để thêm xe buýt mới vào hệ thống
+              Điền thông tin để thêm tuyến đường mới vào hệ thống
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="licensePlate">Biển số xe</Label>
+              <Label htmlFor="nameRoute">Tên tuyến</Label>
               <Input
-                id="licensePlate"
-                value={newVehicle.licensePlate}
+                id="nameRoute"
+                value={newRoute.name}
                 onChange={(e) =>
-                  setNewVehicle((prev) => ({
+                  setNewRoute((prev) => ({
                     ...prev,
-                    licensePlate: e.target.value,
+                    name: e.target.value,
                   }))
                 }
                 placeholder="VD: 29A-12345"
@@ -638,89 +720,97 @@ export default function ManagerVehicles() {
             </div>
 
             <div>
-              <Label htmlFor="brand">Hãng xe</Label>
+              <Label htmlFor="startPoint">Điểm bắt đầu</Label>
               <Input
-                id="brand"
-                value={newVehicle.brand}
+                id="startPoint"
+                value={newRoute.start_point}
                 onChange={(e) =>
-                  setNewVehicle((prev) => ({ ...prev, brand: e.target.value }))
+                  setNewRoute((prev) => ({ ...prev, start_point: e.target.value }))
                 }
                 placeholder="VD: Hyundai"
               />
             </div>
 
             <div>
-              <Label htmlFor="model">Dòng xe</Label>
+              <Label htmlFor="endPoint">Điểm kết thúc</Label>
               <Input
-                id="model"
-                value={newVehicle.model}
+                id="endPoint"
+                value={newRoute.end_point}
                 onChange={(e) =>
-                  setNewVehicle((prev) => ({ ...prev, model: e.target.value }))
+                  setNewRoute((prev) => ({ ...prev, end_point: e.target.value }))
                 }
                 placeholder="VD: Universe"
               />
             </div>
 
-            <div>
-              <Label htmlFor="seats">Số ghế</Label>
-              <Input
-                id="seats"
-                type="number"
-                value={newVehicle.seats}
-                onChange={(e) =>
-                  setNewVehicle((prev) => ({ ...prev, seats: e.target.value }))
-                }
-                placeholder="VD: 45"
-              />
+
+            <div className="p-4 space-y-4">
+              <Label>Số điểm dừng</Label>
+              {/* Nút bấm: Text và chức năng thay đổi theo trạng thái showMap */}
+              <Button
+                type="button"
+                className="w-full justify-center"
+                variant={showMap ? 'outline' : 'default'}
+                onClick={() => setShowMap((prev) => !prev)}
+              >
+                {showMap ? "Ẩn bản đồ" : "Mở bản đồ & Bấm để chọn điểm dừng"}
+              </Button>
+
+              {/* Phần bản đồ chỉ hiển thị khi showMap là true */}
+              {showMap && (
+                <div className="mt-4 border rounded overflow-hidden">
+                  <LeafletMap
+                    height="400px"
+                    zoom={15}
+                    markers={stopPoints.map((p, i) => ({
+                      position: { lat: p.lat, lng: p.lng },
+                      title: p.name || `Trạm ${i + 1}`,
+                      draggable: false,
+
+                    }))}
+                    onMapClick={handleMapClick}
+                  />
+                  <div className="p-3">
+                    <Label>Số điểm dừng: {stopPoints.length}</Label>
+                    <ul className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                      {stopPoints.map((p, idx) => (
+                        <li key={idx} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                          <div>
+                            <div className="text-sm font-medium">#{idx + 1} — {p.lat.toFixed(6)}, {p.lng.toFixed(6)}</div>
+                            <input
+                              className="border rounded px-2 py-1 mt-1 text-sm w-56"
+                              value={p.name || `Trạm ${idx + 1}`}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setStopPoints(prev => prev.map((s, i) => i === idx ? { ...s, name: v } : s));
+                              }}
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => {
+                              setStopPoints(prev => prev.filter((_, i) => i !== idx));
+                            }}>Xóa</Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-2 flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setStopPoints([])}>Xóa tất cả</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div>
-              <Label htmlFor="status">Trạng thái</Label>
-              <Select
-                value={newVehicle.status}
-                onValueChange={(value) =>
-                  setNewVehicle((prev) => ({ ...prev, status: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Đang hoạt động</SelectItem>
-                  <SelectItem value="break">Tạm dừng</SelectItem>
-                  <SelectItem value="maintenance">Bảo trì</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="condition">Tình trạng</Label>
-              <Select
-                value={newVehicle.condition}
-                onValueChange={(value) =>
-                  setNewVehicle((prev) => ({ ...prev, condition: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="excellent">Tuyệt vời</SelectItem>
-                  <SelectItem value="good">Tốt</SelectItem>
-                  <SelectItem value="fair">Khá</SelectItem>
-                  <SelectItem value="poor">Kém</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               Hủy
             </Button>
-            <Button onClick={handleAddVehicle}>
+            <Button onClick={handleAddRoute}>
               <Save className="w-4 h-4 mr-2" />
-              Thêm xe
+              Thêm tuyến
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -732,7 +822,7 @@ export default function ManagerVehicles() {
           <DialogHeader>
             <DialogTitle>Chỉnh sửa thông tin xe</DialogTitle>
             <DialogDescription>
-              Cập nhật thông tin xe buýt trong hệ thống
+              Cập nhật thông tin tuyến đường trong hệ thống
             </DialogDescription>
           </DialogHeader>
 
@@ -857,144 +947,111 @@ export default function ManagerVehicles() {
       </Dialog>
 
       {/* Vehicle Details Dialog */}
-      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="max-w-2xl">
+
+      {/* Edit Route Dialog */}
+      <Dialog open={isRouteEditOpen} onOpenChange={setIsRouteEditOpen}>
+        <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Chi tiết xe buýt</DialogTitle>
+            <DialogTitle>Chỉnh sửa tuyến đường</DialogTitle>
             <DialogDescription>
-              Xem thông tin chi tiết và trạng thái của xe buýt
+              Cập nhật thông tin tuyến đường và các điểm dừng
             </DialogDescription>
           </DialogHeader>
 
-          {selectedVehicle && (
-            <div className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="font-medium">Thông tin cơ bản</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Biển số:</span>
-                      <span className="font-medium">
-                        {selectedVehicle.licensePlate}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Hãng xe:</span>
-                      <span>{selectedVehicle.brand}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Dòng xe:</span>
-                      <span>{selectedVehicle.model}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Số ghế:</span>
-                      <span>{selectedVehicle.seats}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tốc độ TB:</span>
-                      <span>{selectedVehicle.avgSpeed} km/h</span>
-                    </div>
-                  </div>
+          {routeEdit && (
+            <div className="space-y-4">
+              {/* Route Info (same as Add) */}
+              <div>
+                <Label htmlFor="editRouteName">Tên tuyến</Label>
+                <Input
+                  id="editRouteName"
+                  value={routeEdit.name}
+                  onChange={(e) =>
+                    setRouteEdit((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  placeholder="VD: Tuyến 1"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editStartPoint">Điểm bắt đầu</Label>
+                  <Input
+                    id="editStartPoint"
+                    value={routeEdit.start_point}
+                    onChange={(e) =>
+                      setRouteEdit((prev) => ({ ...prev, start_point: e.target.value }))
+                    }
+                    placeholder="VD: Bến xe Mỹ Đình"
+                  />
                 </div>
 
-                <div className="space-y-4">
-                  <h3 className="font-medium">Thông tin vận hành</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tài xế:</span>
-                      <span>
-                        {selectedVehicle.assignedDriver || "Chưa phân công"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Tuyến đường:
-                      </span>
-                      <span>
-                        {selectedVehicle.currentRoute || "Chưa phân công"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Tổng chuyến:
-                      </span>
-                      <span>
-                        {selectedVehicle.totalTrips?.toLocaleString()} chuyến
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tổng km:</span>
-                      <span>
-                        {selectedVehicle.mileage?.toLocaleString()} km
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tình trạng:</span>
-                      {getConditionBadge(selectedVehicle.condition)}
-                    </div>
-                  </div>
+                <div>
+                  <Label htmlFor="editEndPoint">Điểm kết thúc</Label>
+                  <Input
+                    id="editEndPoint"
+                    value={routeEdit.end_point}
+                    onChange={(e) =>
+                      setRouteEdit((prev) => ({ ...prev, end_point: e.target.value }))
+                    }
+                    placeholder="VD: Bến xe Lương Yên"
+                  />
                 </div>
               </div>
 
-              {/* Maintenance & Fuel Status */}
-              <div className="space-y-4 pt-4 border-t">
-                <h3 className="font-medium">Trạng thái Kỹ thuật</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Fuel Status */}
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="font-medium flex items-center gap-1">
-                        <Gauge className="w-4 h-4" /> Mức nhiên liệu
-                      </span>
-                      <span className="font-semibold">
-                        {selectedVehicle.fuelLevel}%
-                      </span>
-                    </div>
-                    <Progress
-                      value={selectedVehicle.fuelLevel}
-                      className="h-2"
-                      indicatorClassName={getFuelLevelColor(
-                        selectedVehicle.fuelLevel
-                      )}
-                    />
-                  </div>
+              {/* Stops section - mirror Add UI */}
+              <div className="p-4 space-y-4">
+                <Label>Số điểm dừng</Label>
+                <Button
+                  type="button"
+                  className="w-full justify-center"
+                  variant={showMap ? "outline" : "default"}
+                  onClick={() => setShowMap((prev) => !prev)}
+                >
+                  {showMap ? "Ẩn bản đồ" : "Mở bản đồ & Bấm để chọn điểm dừng"}
+                </Button>
 
-                  {/* Maintenance Status */}
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        <Wrench className="w-4 h-4" /> Bảo trì tiếp theo
-                      </span>
-                      {isMaintenanceDue(selectedVehicle.nextMaintenance) ? (
-                        <Badge variant="destructive">Sắp đến hạn</Badge>
-                      ) : (
-                        <Badge variant="secondary">Ổn định</Badge>
-                      )}
-                    </div>
-                    <div className="text-sm mt-1">
-                      <p>
-                        <span className="text-muted-foreground">Cuối:</span>{" "}
-                        {new Date(
-                          selectedVehicle.lastMaintenance
-                        ).toLocaleDateString("vi-VN")}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Tiếp:</span>{" "}
-                        <span
-                          className={
-                            isMaintenanceDue(selectedVehicle.nextMaintenance)
-                              ? "text-red-600 font-medium"
-                              : ""
-                          }
-                        >
-                          {new Date(
-                            selectedVehicle.nextMaintenance
-                          ).toLocaleDateString("vi-VN")}
-                        </span>
-                      </p>
+                {showMap && (
+                  <div className="mt-4 border rounded overflow-hidden">
+                    <LeafletMap
+                      height="400px"
+                      zoom={15}
+                      markers={editStopPoints.map((p, i) => ({
+                        position: { lat: p.lat, lng: p.lng },
+                        title: p.name || `Trạm ${i + 1}`,
+                        draggable: false,
+
+                      }))}
+                      onMapClick={handleEditMapClick}
+                    />
+                    <div className="p-3">
+                      <Label>Số điểm dừng: {editStopPoints.length}</Label>
+                      <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                        {editStopPoints.map((p, idx) => (
+                          <li key={idx} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                            <div>
+                              <div className="text-sm font-medium">#{idx + 1} — {p.lat.toFixed(6)}, {p.lng.toFixed(6)}</div>
+                              <input
+                                className="border rounded px-2 py-1 mt-1 text-sm w-56"
+                                value={p.name || `Trạm ${idx + 1}`}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setEditStopPoints(prev => prev.map((s, i) => i === idx ? { ...s, name: v } : s));
+                                }}
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => handleRemoveEditStop(idx)}>Xóa</Button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-2 flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => { setRemovedStopIds(editStopPoints.filter(s => s.id).map(s => s.id)); setEditStopPoints([]); }}>Xóa tất cả</Button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -1002,22 +1059,47 @@ export default function ManagerVehicles() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setIsDetailDialogOpen(false)}
+              onClick={() => setIsRouteEditOpen(false)}
             >
-              Đóng
+              Hủy
             </Button>
-            <Button
-              onClick={() => {
-                setIsDetailDialogOpen(false);
-                handleEditVehicle(selectedVehicle);
-              }}
-            >
-              <Edit className="w-4 h-4 mr-2" />
-              Chỉnh sửa
+            <Button onClick={handleSaveEditedRoute}>
+              <Save className="w-4 h-4 mr-2" />
+              Lưu thay đổi
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Route Dialog */}
+      <Dialog open={isDeleteRouteDialogOpen} onOpenChange={setIsDeleteRouteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác nhận xóa tuyến</DialogTitle>
+            <DialogDescription>
+              Hành động này sẽ xóa tuyến và tất cả điểm dừng liên quan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Alert>
+              <AlertDescription>
+                Bạn có chắc chắn muốn xóa tuyến{" "}
+                <strong>{routeToDelete?.name || routeToDelete?.id}</strong>? Hành động này không thể hoàn tác.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsDeleteRouteDialogOpen(false); setRouteToDelete(null); }}>
+              Hủy
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteRoute}>
+              Xóa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
+
   );
 }

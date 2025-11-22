@@ -51,7 +51,7 @@ import {
   X,
   Eye,
 } from "lucide-react";
-import { getAllBus, createBus, updateBus, deleteBus } from "../../service/adminService";
+import { getAllBus, createBus, updateBus, deleteBus, getAllSchedule } from "../../service/adminService";
 
 export default function ManagerVehicles() {
   const { system, showError } = useNotificationHelpers();
@@ -321,7 +321,25 @@ export default function ManagerVehicles() {
   };
 
   const confirmDeleteBus = async () => {
+    if (!selectedBus || !selectedBus.id) {
+      showError("Lỗi", "Không có xe để xóa.");
+      setIsDeleteDialogOpen(false);
+      setSelectedBus(null);
+      return;
+    }
+
     try {
+      // kiểm tra lịch trình tham chiếu tới xe
+      const schedRes = await getAllSchedule();
+      const schedules = Array.isArray(schedRes?.data) ? schedRes.data : (schedRes?.data?.DT || []);
+      const referencing = (schedules || []).filter((s) => String(s.bus_id) === String(selectedBus.id));
+      if (referencing.length > 0) {
+        showError("Không thể xóa", `Xe đang có ${referencing.length} lịch trình liên quan. Vui lòng xóa hoặc chuyển các lịch trình đó trước khi xóa xe.`);
+        setIsDeleteDialogOpen(false);
+        setSelectedBus(null);
+        return;
+      }
+
       await deleteBus(selectedBus.id);
       console.log("Deleting bus:", selectedBus);
       system.dataDeleted(`Xe bus ${selectedBus.id}`);
