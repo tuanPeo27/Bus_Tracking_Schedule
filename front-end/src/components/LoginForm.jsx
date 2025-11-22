@@ -81,7 +81,7 @@ export function LoginForm({ onLogin }) {
     } catch (err) {
       console.error(err);
       showError(
-        "Lỗi kết nối",
+        "Đăng nhập thất bại",
         err?.response?.data?.EM ||
           "Không thể kết nối đến máy chủ. Vui lòng thử lại sau."
       );

@@ -28,7 +28,7 @@ import {
 
 export function ParentApp({ onBack }) {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const { system } = useNotificationHelpers();
+  const { showInfo } = useNotificationHelpers();
   const { clearAll } = useNotifications();
   const isMobile = useIsMobile();
 
@@ -119,13 +119,13 @@ export function ParentApp({ onBack }) {
         content:
           typeof notification === "string"
             ? notification
-            : notification?.message || "Không có nội dung",
+            : notification?.message || String(notification),
         timestamp: new Date(),
         isRead: false,
         type: notification?.type || "info",
       };
 
-      // Lưu
+      // Lưu vào state + localStorage
       setNotificationsList((prev) => {
         const updated = [newNotification, ...prev];
         localStorage.setItem(
@@ -135,23 +135,8 @@ export function ParentApp({ onBack }) {
         return updated;
       });
 
-      // Toast
-      switch (newNotification.type) {
-        case "success":
-        case "arrival":
-          system.success(newNotification.title, newNotification.content);
-          break;
-        case "warning":
-        case "schedule_change":
-          system.warning(newNotification.title, newNotification.content);
-          break;
-        case "error":
-        case "delay":
-          system.error(newNotification.title, newNotification.content);
-          break;
-        default:
-          system.info(newNotification.title, newNotification.content);
-      }
+      // TOAST
+      showInfo(newNotification.title, newNotification.content);
     };
 
     socket.on(`parent-notify-${parentInfo.id}`, handleNotification);
