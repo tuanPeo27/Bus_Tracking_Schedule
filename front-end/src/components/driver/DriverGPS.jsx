@@ -28,13 +28,8 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
   // Tách ra 2 state riêng biệt cho đường đi
   const [staticRouteCoords, setStaticRouteCoords] = useState([]); // Đường nối các trạm (Cố định)
   const [driverToFirstStopCoords, setDriverToFirstStopCoords] = useState([]); // Đường từ Tài xế -> Trạm 1 (Thay đổi)
-<<<<<<< HEAD
   // Radius (meters) within which a stop is considered 'reached' and should be removed
-  const STOP_REMOVE_RADIUS = 50; // meters
-=======
-    // Radius (meters) within which a stop is considered 'reached' and should be removed
-    const STOP_REMOVE_RADIUS = 100; // meters
->>>>>>> 49480ab9f24ba0761bac83f586b40ee710fccdef
+  const STOP_REMOVE_RADIUS = 100; // meters
 
   // Haversine distance in meters between two lat/lng points
   const distanceMeters = (a, b) => {
@@ -284,17 +279,15 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
 
         //TODO: Tao sua ne
         // setCurrentLocation({ lat: latitude, lng: longitude });
-<<<<<<< HEAD
-        socket.emit("bus-location", { busId: 1, latitude, longitude });
-=======
 
         const bid = vehicleIdRef.current;
         if (!bid) {
-          console.warn("vehicle_id not available yet — skipping immediate emit");
+          console.warn(
+            "vehicle_id not available yet — skipping immediate emit"
+          );
         } else {
           socket.emit("bus-location", { busId: bid, latitude, longitude });
         }
->>>>>>> 49480ab9f24ba0761bac83f586b40ee710fccdef
       },
       (error) => {
         setLocationError(error.message);
@@ -327,7 +320,9 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
           longitude: currentLocation.lng,
         });
       } else {
-        console.warn("vehicle_id not set — skipping initial bus_location_update emit");
+        console.warn(
+          "vehicle_id not set — skipping initial bus_location_update emit"
+        );
       }
     } catch (e) {
       console.warn("Failed to emit initial location:", e);
@@ -341,7 +336,9 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
           const bid = vehicleIdRef.current;
           console.log("Emitting location for bus:", bid);
           if (!bid) {
-            console.warn("vehicle_id not available yet; skipping periodic emit");
+            console.warn(
+              "vehicle_id not available yet; skipping periodic emit"
+            );
           } else {
             socket.emit("bus-location", {
               busId: bid,
