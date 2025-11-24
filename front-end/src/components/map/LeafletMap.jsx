@@ -11,6 +11,7 @@ export function LeafletMap({
   markers = [],
   className,
   polylines = [],
+  onMapClick = null,
 }) {
   const mapRef = useRef(null);
   const markerGroupRef = useRef(null);
@@ -49,6 +50,14 @@ export function LeafletMap({
       polylineGroupRef.current = L.layerGroup().addTo(mapRef.current);
 
       mapRef.current.on("dragstart", () => setIsFollowing(false));
+      mapRef.current.on("click", (e) => {
+        try {
+          if (typeof onMapClick === "function")
+            onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
+        } catch (err) {
+          /* ignore */
+        }
+      });
     }
   }, []);
 
@@ -67,6 +76,16 @@ export function LeafletMap({
       })
         .addTo(markerGroupRef.current)
         .bindPopup(marker.title || "");
+
+      if (marker.onClick && typeof marker.onClick === "function") {
+        leafletMarker.on("click", (e) => {
+          try {
+            marker.onClick(marker);
+          } catch (err) {
+            /* ignore */
+          }
+        });
+      }
 
       // Nếu có callback onDrag, dùng event
       if (marker.draggable && marker.onDrag) {
