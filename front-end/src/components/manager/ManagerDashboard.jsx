@@ -139,66 +139,6 @@ export default function ManagerDashboard() {
   }, []);
 
 
-  const recentAlerts = [
-    {
-      id: 1,
-      type: "warning",
-      message: "Xe 29A-12345 báo cáo sự cố kỹ thuật",
-      time: "10 phút trước",
-      severity: "medium",
-    },
-    {
-      id: 2,
-      type: "info",
-      message: "Tài xế Nguyễn Văn Minh yêu cầu nghỉ phép ngày mai",
-      time: "30 phút trước",
-      severity: "low",
-    },
-    {
-      id: 3,
-      type: "urgent",
-      message: "Tuyến 3 gặp tắc đường nghiêm trọng",
-      time: "1 giờ trước",
-      severity: "high",
-    },
-  ];
-
-
-
-  // const upcomingSchedules = [
-  //   {
-  //     time: "14:30",
-  //     route: "Tuyến 1",
-  //     driver: "Nguyễn Văn Minh",
-  //     vehicle: "29A-12345",
-  //     students: 42,
-  //   },
-  //   {
-  //     time: "15:00",
-  //     route: "Tuyến 2",
-  //     driver: "Trần Văn Hùng",
-  //     vehicle: "29A-67890",
-  //     students: 38,
-  //   },
-  //   {
-  //     time: "15:30",
-  //     route: "Tuyến 3",
-  //     driver: "Lê Thị Lan",
-  //     vehicle: "29A-11111",
-  //     students: 45,
-  //   },
-  // ];
-
-  const getAlertIcon = (type) => {
-    switch (type) {
-      case "urgent":
-        return <AlertTriangle className="w-4 h-4 text-red-500" />;
-      case "warning":
-        return <AlertTriangle className="w-4 h-4 text-orange-500" />;
-      default:
-        return <CheckCircle className="w-4 h-4 text-blue-500" />;
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -270,7 +210,7 @@ export default function ManagerDashboard() {
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-1 gap-6">
         {/* Performance Overview */}
         <div className="lg:col-span-2 space-y-6">
 
@@ -302,7 +242,7 @@ export default function ManagerDashboard() {
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Tài xế</p>
-                        <p className="font-medium">{schedule.driverInfo?.data?.DT?.username}</p>
+                        <p className="font-medium">{schedule.driverInfo?.data?.DT?.driver?.username}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Xe</p>
@@ -318,53 +258,7 @@ export default function ManagerDashboard() {
           </Card>
         </div>
 
-        {/* Alerts and Notifications */}
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5" />
-                Cảnh báo gần đây
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {recentAlerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg"
-                  >
-                    {getAlertIcon(alert.type)}
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{alert.message}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {alert.time}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={
-                        alert.severity === "high"
-                          ? "destructive"
-                          : alert.severity === "medium"
-                            ? "default"
-                            : "secondary"
-                      }
-                      className="text-xs"
-                    >
-                      {alert.severity === "high"
-                        ? "Khẩn cấp"
-                        : alert.severity === "medium"
-                          ? "Quan trọng"
-                          : "Thông tin"}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
-
-        </div>
       </div>
     </div>
   );

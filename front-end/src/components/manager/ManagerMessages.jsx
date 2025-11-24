@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -21,19 +21,36 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import socket from "../../setup/socket";
+import { useNotificationHelpers } from "../useNotificationHelpers";
+import { getAllParent, getAllDriver } from "../../service/adminService";
 
 export default function ManagerMessages() {
+  const { showSuccess, showError, showInfo } = useNotificationHelpers();
   const [selectedRecipient, setSelectedRecipient] = useState("");
   const [specificRecipient, setSpecificRecipient] = useState("");
+  const [recipientCategory, setRecipientCategory] = useState("driver"); // "driver" | "parent"
   const [messageType, setMessageType] = useState("info");
   const [message, setMessage] = useState("");
 
-  const drivers = [
-    { id: "TX001", name: "Nguyễn Văn Minh" },
-    { id: "TX002", name: "Trần Văn Hùng" },
-    { id: "TX003", name: "Lê Thị Lan" },
-    { id: "TX004", name: "Phạm Văn Đức" },
-  ];
+  const [driversList, setDriversList] = useState([]);
+  const [parentsList, setParentsList] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const [pRes, dRes] = await Promise.all([getAllParent(), getAllDriver()]);
+        const parents = (pRes?.data?.DT) || (pRes?.data) || [];
+        const drivers = (dRes?.data?.DT) || (dRes?.data) || [];
+        if (!mounted) return;
+        setParentsList(Array.isArray(parents) ? parents : []);
+        setDriversList(Array.isArray(drivers) ? drivers : []);
+      } catch (err) {
+        console.warn("Không lấy được danh sách parents/drivers:", err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const recentMessages = [
     {
@@ -68,6 +85,11 @@ export default function ManagerMessages() {
 
   const handleSendMessage = () => {
     if (!message.trim() || !selectedRecipient) return;
+    if (selectedRecipient === "specific" && !specificRecipient) return;
+    if (!socket || !socket.connected) {
+      showError("Lỗi", "Socket chưa kết nối, thử lại sau.");
+      return;
+    }
 
     const payload = {
       title:
@@ -76,6 +98,8 @@ export default function ManagerMessages() {
           : messageType === "reminder"
             ? "Lời nhắc"
             : "Thông báo",
+      // ParentApp expects `message` (preferred) — giữ cả hai để tương thích
+      message: message,
       content: message,
       type: messageType,
       from: "manager",
@@ -83,58 +107,63 @@ export default function ManagerMessages() {
     };
 
     try {
-      // Emit depending on recipient
+      console.log("Prepare send notification", { selectedRecipient, recipientCategory, specificRecipient, payload });
+      showInfo("Đang gửi", "Tin nhắn đang được gửi lên server...");
+
+      // helper để emit với ack + fallback timeout
+      const emitWithAck = (eventPayload, successMsg) => {
+        let acked = false;
+        socket.emit("manager-send-notification", eventPayload, (ack) => {
+          acked = true;
+          if (ack?.ok) showSuccess("Thành công", successMsg);
+          else showError("Lỗi", ack?.message || "Server trả về lỗi");
+        });
+        setTimeout(() => {
+          if (!acked) {
+            showError("Lỗi", "Không nhận phản hồi từ server sau 5s. Kiểm tra kết nối hoặc server.");
+            console.warn("No ack from server for payload", eventPayload);
+          }
+        }, 5000);
+      };
+
       if (selectedRecipient === "all_parents") {
-        socket.emit(
-          "manager-send-notification",
-          { target: "all_parents", ...payload },
-          (ack) => {
-            if (ack?.ok) alert("Đã gửi cho tất cả phụ huynh");
-          }
-        );
+        // chính: gửi cho server xử lý broadcast
+        emitWithAck({ target: "all_parents", ...payload }, "Đã gửi cho tất cả phụ huynh");
+        // fallback: emit trực tiếp event parent-notify-<id> cho từng parent (nếu server chuyển tiếp các event này)
+        if (Array.isArray(parentsList) && parentsList.length > 0) {
+          parentsList.forEach((p) => {
+            try {
+              socket.emit(`parent-notify-${p.id}`, payload);
+            } catch (e) {
+              // noop
+            }
+          });
+        }
       } else if (selectedRecipient === "all_drivers") {
-        socket.emit(
-          "manager-send-notification",
-          { target: "all_drivers", ...payload },
-          (ack) => {
-            if (ack?.ok) alert("Đã gửi cho tất cả tài xế");
-          }
-        );
+        emitWithAck({ target: "all_drivers", ...payload }, "Đã gửi cho tất cả tài xế");
       } else if (selectedRecipient === "specific") {
-        // Try to detect driver id first (from dropdown), otherwise treat as parent id
-        if (drivers.find((d) => d.id === specificRecipient)) {
-          socket.emit(
-            "manager-send-notification",
-            { target: "driver", driverId: specificRecipient, ...payload },
-            (ack) => {
-              if (ack?.ok) alert("Đã gửi cho tài xế");
-            }
-          );
+        if (recipientCategory === "driver") {
+          emitWithAck({ target: "driver", driverId: specificRecipient, ...payload }, "Đã gửi cho tài xế");
         } else {
-          socket.emit(
-            "manager-send-notification",
-            { target: "parent", parentId: specificRecipient, ...payload },
-            (ack) => {
-              if (ack?.ok) alert("Đã gửi cho phụ huynh");
-            }
-          );
+          emitWithAck({ target: "parent", parentId: specificRecipient, ...payload }, "Đã gửi cho phụ huynh");
+          // fallback emit trực tiếp event parent-notify-<id> để tăng xác suất nhận (server có thể chuyển tiếp)
+          try {
+            socket.emit(`parent-notify-${specificRecipient}`, payload);
+          } catch (e) { /* noop */ }
         }
       }
 
-      console.log("Sent payload:", {
-        recipient: selectedRecipient,
-        specificRecipient,
-        ...payload,
-      });
+      console.log("Emit done (optimistic)", { selectedRecipient, specificRecipient, payload });
     } catch (err) {
       console.error("Socket send error", err);
-      alert("Gửi thất bại, thử lại sau.");
+      showError("Lỗi", err?.message || "Gửi thất bại, thử lại sau.");
     }
 
     // Clear form
     setMessage("");
     setSelectedRecipient("");
     setSpecificRecipient("");
+    setRecipientCategory("driver");
     setMessageType("info");
 
     // keep existing confirmation minimal (socket callbacks above also notify)
@@ -202,26 +231,39 @@ export default function ManagerMessages() {
             </div>
 
             {selectedRecipient === "specific" && (
-              <div>
-                <Label>Chọn người cụ thể</Label>
-                <Select
-                  value={specificRecipient}
-                  onValueChange={setSpecificRecipient}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn tài xế hoặc phụ huynh" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <optgroup label="Tài xế">
-                      {drivers.map((driver) => (
-                        <SelectItem key={driver.id} value={driver.id}>
-                          {driver.name}
+              <>
+                <div>
+                  <Label>Loại người nhận</Label>
+                  <Select value={recipientCategory} onValueChange={(v) => { setRecipientCategory(v); setSpecificRecipient(""); }}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="driver">Tài xế</SelectItem>
+                      <SelectItem value="parent">Phụ huynh</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Chọn người cụ thể ({recipientCategory === "driver" ? "Tài xế" : "Phụ huynh"})</Label>
+                  <Select value={specificRecipient} onValueChange={setSpecificRecipient}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={`Chọn ${recipientCategory === "driver" ? "tài xế" : "phụ huynh"}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(recipientCategory === "driver" ? driversList : parentsList).length === 0 && (
+                        <div className="p-2 text-sm text-muted-foreground">Không có dữ liệu</div>
+                      )}
+                      {(recipientCategory === "driver" ? driversList : parentsList).map((item) => (
+                        <SelectItem key={item.id} value={String(item.id)}>
+                          {item.name || item.username || item.id}
                         </SelectItem>
                       ))}
-                    </optgroup>
-                  </SelectContent>
-                </Select>
-              </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
             )}
 
             <div>
@@ -252,74 +294,18 @@ export default function ManagerMessages() {
           <div className="flex gap-2">
             <Button
               onClick={handleSendMessage}
-              disabled={!message.trim() || !selectedRecipient}
+              disabled={!message.trim() || !selectedRecipient || (selectedRecipient === "specific" && !specificRecipient)}
               className="bg-blue-600 hover:bg-blue-700"
             >
               <Send className="w-4 h-4 mr-2" />
               Gửi tin nhắn
             </Button>
 
-            <Button variant="outline">Lưu nháp</Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Quick Message Templates */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Mẫu tin nhắn nhanh</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-3 gap-4">
-            <Button
-              variant="outline"
-              className="h-auto p-4 text-left"
-              onClick={() =>
-                setMessage(
-                  "Xe buýt sẽ đến điểm đón trong 10 phút. Vui lòng chuẩn bị sẵn sàng."
-                )
-              }
-            >
-              <div>
-                <p className="font-medium">Thông báo đến điểm</p>
-                <p className="text-sm text-muted-foreground">
-                  Gửi cho phụ huynh
-                </p>
-              </div>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="h-auto p-4 text-left"
-              onClick={() =>
-                setMessage(
-                  "Vui lòng kiểm tra tình trạng xe và báo cáo trước khi bắt đầu ca làm việc."
-                )
-              }
-            >
-              <div>
-                <p className="font-medium">Kiểm tra xe</p>
-                <p className="text-sm text-muted-foreground">Gửi cho tài xế</p>
-              </div>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="h-auto p-4 text-left"
-              onClick={() =>
-                setMessage(
-                  "Do thời tiết xấu, lịch trình có thể bị thay đổi. Chúng tôi sẽ thông báo cập nhật sớm nhất."
-                )
-              }
-            >
-              <div>
-                <p className="font-medium">Thay đổi lịch trình</p>
-                <p className="text-sm text-muted-foreground">Thông báo chung</p>
-              </div>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Recent Messages */}
       <Card>
@@ -371,51 +357,7 @@ export default function ManagerMessages() {
       </Card>
 
       {/* Message Statistics */}
-      <div className="grid md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <MessageSquare className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  Tin nhắn hôm nay
-                </p>
-                <p className="font-semibold">24</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Bell className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Đã đọc</p>
-                <p className="font-semibold">89%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Tin khẩn cấp</p>
-                <p className="font-semibold">3</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }

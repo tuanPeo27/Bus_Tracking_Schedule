@@ -428,25 +428,6 @@ export default function ManagerSchedules() {
                     </div>
 
                   </div>
-                  <div className="space-y-2">
-                    <Label >Trạng thái</Label>
-                    <Select
-                      value={newSchedule.status}
-                      onValueChange={(value) =>
-                        setNewSchedule({ ...newSchedule, status: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn trạng thái" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="scheduled">Lên lịch</SelectItem>
-                        <SelectItem value="in_progress">Đang tiến hành</SelectItem>
-                        <SelectItem value="completed">Hoàn thành</SelectItem>
-                        <SelectItem value="cancelled">Đã hủy</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                   <div className="flex gap-2 pt-4">
                     <Button onClick={handleCreateSchedule} className="flex-1">
                       Tạo lịch trình
@@ -580,7 +561,7 @@ export default function ManagerSchedules() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4" />
-                          {schedule.driverInfo?.data?.DT?.username}
+                          {schedule.driverInfo?.data?.DT?.driver?.username}
                         </div>
                       </TableCell>
                       <TableCell>
