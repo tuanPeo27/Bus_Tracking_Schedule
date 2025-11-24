@@ -11,73 +11,123 @@ const GEOAPIFY_KEY = "2b833a5c3c1649d89c2e52d7976c7534";
 export function ParentTracking({ studentInfo, routeInfo }) {
   const isMobile = useIsMobile();
 
-  const students = Array.isArray(studentInfo)
-    ? studentInfo
-    : studentInfo
-    ? [studentInfo]
-    : [];
-  const routes = Array.isArray(routeInfo)
-    ? routeInfo
-    : routeInfo
-    ? [routeInfo]
-    : [];
+  // ---- FIX ROUTE INFO + STUDENT INFO ----
+  const students = Array.isArray(studentInfo) ? studentInfo : studentInfo ? [studentInfo] : [];
+  const routes = Array.isArray(routeInfo) ? routeInfo : routeInfo ? [routeInfo] : [];
 
-  const routeIds = routes.map((r) => r.route?.id);
+  // --- SỬA LỖI 1: GỘP KHAI BÁO ROUTE IDS VÀO MỘT CHỖ DUY NHẤT ---
+  // Sử dụng useMemo để tính toán routeIds và chỉ tính lại khi routes thay đổi
+  const routeIds = useMemo(() => {
+    return routes.map((r) => r.route?.id);
+  }, [routes]); 
+  
+  // Tạo string để làm dependency cho useEffect fetch (tránh loop)
+  const routeIdsString = routeIds.join(',');
 
   const [currentLocation, setCurrentLocation] = useState({
     lat: 10.8231,
     lng: 106.6297,
-  });
+  }); 
   const [busStops, setBusStops] = useState([]);
+
+  // Static & dynamic route
   const [staticRouteCoords, setStaticRouteCoords] = useState([]);
   const [driverToFirstStopCoords, setDriverToFirstStopCoords] = useState([]);
   const [routeStatus, setRouteStatus] = useState("idle");
-  const [locationError, setLocationError] = useState("");
 
   const isFetchingStatic = useRef(false);
   const isFetchingDynamic = useRef(false);
 
-  // ---- SOCKET.IO ----
   const socket = useMemo(() => io("http://26.58.101.232:5000"), []);
+  const STOP_REMOVE_RADIUS = 100;
 
+  const distanceMeters = (a, b) => {
+    if (!a || !b) return Infinity;
+    const toRad = (v) => (v * Math.PI) / 180;
+    const R = 6371000;
+    const dLat = toRad(b.lat - a.lat);
+    const dLon = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const sinDlat = Math.sin(dLat / 2);
+    const sinDlon = Math.sin(dLon / 2);
+    const h = sinDlat * sinDlat + Math.cos(lat1) * Math.cos(lat2) * sinDlon * sinDlon;
+    const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    return R * c;
+  };
+
+  // Logic đánh dấu trạm đã đi qua
   useEffect(() => {
-    socket.on("connect", () => {
-      console.log("Socket connected:", socket.id);
-    });
-    socket.on("connect_error", (err) => {
-      console.error("Socket connect error:", err);
-    });
+    if (!currentLocation || !busStops || busStops.length === 0) return;
 
-    const handleUpdate = (data) => {
-      console.log(data);
-      setCurrentLocation({
-        lat: data.latitude,
-        lng: data.longitude,
-      });
-    };
-    socket.on("bus-location-update", handleUpdate);
+    const nextUnvisitedIndex = busStops.findIndex((s) => !s.visited);
+    if (nextUnvisitedIndex === -1) return;
 
-    return () => {
-      socket.off("bus-location-update", handleUpdate);
+    const nextStop = busStops[nextUnvisitedIndex];
+    const stopPos = {
+      lat: Number(nextStop.latitude),
+      lng: Number(nextStop.longitude),
     };
-  }, [socket]);
+
+    const dist = distanceMeters(currentLocation, stopPos);
+
+    if (dist <= STOP_REMOVE_RADIUS) {
+      setBusStops((prevStops) =>
+        prevStops.map((s, index) => {
+          if (index === nextUnvisitedIndex) {
+            return { ...s, visited: true };
+          }
+          return s;
+        })
+      );
+    }
+  }, [currentLocation, busStops]);
 
   // ---- FETCH BUS STOPS ----
   useEffect(() => {
     if (!routeIds || routeIds.length === 0) return;
+
     const fetchStops = async () => {
       try {
         const res = await getBusStopsByRouteId(routeIds);
-        if (res?.data?.EC === 0) setBusStops(res.data.DT || []);
+        if (res?.data?.EC === 0) {
+          const sorted = res.data.DT || [];
+          setBusStops(sorted);
+        }
       } catch (e) {
         console.error("Error loading bus stops", e);
       }
     };
-    fetchStops();
-  }, [routeIds]);
 
-  // ---- GEOAPIFY ROUTE HELPER ----
+    fetchStops();
+    // Dùng chuỗi ID làm dependency để tránh infinite loop
+  }, [routeIdsString]); 
+
+  // ---- SỬA LỖI 2: SOCKET LISTENER ----
+  useEffect(() => {
+    const handleLocationUpdate = (data) => {
+      try {
+        setCurrentLocation({
+          lat: data.latitude,
+          lng: data.longitude,
+        });
+      } catch (error) {
+        console.log(error);
+      }
+    };
+
+    // Lắng nghe sự kiện
+    socket.on("bus-location-update", handleLocationUpdate);
+
+    // CLEANUP FUNCTION: Quan trọng! Hủy lắng nghe khi component unmount
+    return () => {
+        socket.off("bus-location-update", handleLocationUpdate);
+    };
+  }, [socket]); // Chỉ chạy lại khi biến socket thay đổi (thường là chỉ 1 lần)
+
+  // ---- GEOAPIFY FETCH ----
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
   const fetchSegment = async (a, b) => {
     const url = `https://api.geoapify.com/v1/routing?waypoints=${a.lat},${a.lng}|${b.lat},${b.lng}&mode=bus&apiKey=${GEOAPIFY_KEY}`;
     try {
@@ -100,61 +150,95 @@ export function ParentTracking({ studentInfo, routeInfo }) {
     }
   };
 
-  // ---- STATIC ROUTE ----
+  // ---- STATIC ROUTE (BUS ROUTE) ----
   useEffect(() => {
-    const build = async () => {
-      if (busStops.length < 2 || isFetchingStatic.current) return;
-      if (staticRouteCoords.length > 0) return;
+    const buildStaticRoute = async () => {
+      if (!busStops || busStops.length < 2 || isFetchingStatic.current) return;
+
+      // Clear previous static route so we rebuild according to latest stops
+      setStaticRouteCoords([]);
 
       isFetchingStatic.current = true;
-      setRouteStatus("Đang vẽ tuyến cố định...");
+      setRouteStatus("Đang vẽ tuyến đường cố định...");
 
-      const stops = busStops.map((s) => ({
+      let allCoords = [];
+      // Only include unvisited stops when building the static route
+      const unvisited = (busStops || []).filter((s) => !s.visited);
+      if (unvisited.length < 2) {
+        setStaticRouteCoords([]);
+        isFetchingStatic.current = false;
+        setRouteStatus("Đã tải xong tuyến đường.");
+        return;
+      }
+      const stops = unvisited.map((s) => ({
         lat: Number(s.latitude),
         lng: Number(s.longitude),
       }));
 
-      let all = [];
       for (let i = 0; i < stops.length - 1; i++) {
+        // Delay nhỏ để tránh spam API
         await sleep(200);
         const seg = await fetchSegment(stops[i], stops[i + 1]);
-        if (seg.length > 0)
-          all = all.length > 0 ? [...all, ...seg.slice(1)] : [...seg];
-        else all.push(stops[i], stops[i + 1]);
+
+        if (seg.length > 0) {
+          // Nối mảng, tránh trùng điểm nối
+          if (allCoords.length > 0) {
+            allCoords = [...allCoords, ...seg.slice(1)];
+          } else {
+            allCoords = [...seg];
+          }
+        } else {
+          // Fallback đường thẳng nếu API lỗi
+          allCoords.push(stops[i], stops[i + 1]);
+        }
       }
 
-      setStaticRouteCoords(all);
-      setRouteStatus("Đã tải xong.");
+      setStaticRouteCoords(allCoords);
+      setRouteStatus("Đã tải xong tuyến đường.");
       isFetchingStatic.current = false;
     };
-    build();
+
+    buildStaticRoute();
   }, [busStops]);
 
-  // ---- DYNAMIC ROUTE ----
+  // ---- DYNAMIC ROUTE (driver → first stop) ----
   useEffect(() => {
-    const build = async () => {
+    const buildDynamicRoute = async () => {
       if (
         !currentLocation ||
+        !busStops ||
         busStops.length === 0 ||
         isFetchingDynamic.current
       )
         return;
 
+      const nextUnvisited = busStops.find((s) => !s.visited);
+      
+      if (!nextUnvisited) {
+        setDriverToFirstStopCoords([]);
+        return;
+      }
+      
       isFetchingDynamic.current = true;
-      const firstStop = {
-        lat: Number(busStops[0].latitude),
-        lng: Number(busStops[0].longitude),
+
+      const firstStopCoords = {
+        lat: Number(nextUnvisited.latitude),
+        lng: Number(nextUnvisited.longitude),
       };
-      const seg = await fetchSegment(currentLocation, firstStop);
+
+      const seg = await fetchSegment(currentLocation, firstStopCoords);
+
       setDriverToFirstStopCoords(
-        seg.length > 0 ? seg : [currentLocation, firstStop]
+        seg.length > 0 ? seg : [currentLocation, firstStopCoords]
       );
+
       isFetchingDynamic.current = false;
     };
-    build();
+
+    buildDynamicRoute();
   }, [currentLocation, busStops]);
 
-  // ---- POLYLINES ----
+  // ---- COMBINE POLYLINES ----
   const polylines = useMemo(() => {
     const lines = [];
     if (driverToFirstStopCoords.length > 0)
@@ -165,14 +249,17 @@ export function ParentTracking({ studentInfo, routeInfo }) {
         weight: 6,
         dashArray: "10,10",
       });
-    if (staticRouteCoords.length > 0)
+
+    if (staticRouteCoords.length > 0) {
       lines.push({
-        id: "static-route",
+        id: "route-static-busline",
         positions: staticRouteCoords,
-        color: "#28a745",
+        color: "#28a745", // Green
         weight: 4,
-        opacity: 0.6,
+        opacity: 0.5,
       });
+    }
+
     return lines;
   }, [driverToFirstStopCoords, staticRouteCoords]);
 
@@ -196,12 +283,9 @@ export function ParentTracking({ studentInfo, routeInfo }) {
     ];
   }, [currentLocation, busStops]);
 
-  // ---- RENDER ----
   return (
     <div className="space-y-6">
-      <div
-        className={`grid ${isMobile ? "grid-cols-1" : "lg:grid-cols-3"} gap-6`}
-      >
+      <div className={`grid ${isMobile ? "grid-cols-1" : "lg:grid-cols-3"} gap-6`}>
         <div className="lg:col-span-2">
           <div className="mb-2 text-sm text-gray-600 flex justify-between">
             <span>
@@ -211,9 +295,7 @@ export function ParentTracking({ studentInfo, routeInfo }) {
               GPS OK
             </span>
           </div>
-          {locationError && (
-            <p className="text-red-500 text-sm">{locationError}</p>
-          )}
+
           <LeafletMap
             height={isMobile ? "400px" : "600px"}
             center={currentLocation}
@@ -230,28 +312,23 @@ export function ParentTracking({ studentInfo, routeInfo }) {
               <CardTitle>Các điểm đón/trả</CardTitle>
             </CardHeader>
             <CardContent className="max-h-[600px] overflow-y-auto space-y-4">
-              {students.length === 0 && (
+              {studentInfo.length === 0 && (
                 <p className="text-sm text-center text-gray-500 py-4">
                   Chưa có dữ liệu học sinh
                 </p>
               )}
-              {students.map((student, index) => (
-                <div
-                  key={student.id || index}
-                  className="border-l-2 border-gray-200 pl-4 pb-4"
-                >
+              {studentInfo.map((student, index) => (
+                <div key={student.id || index} className="border-l-2 border-gray-200 pl-4 pb-4">
                   <div className="bg-white p-3 rounded-lg shadow-sm border space-y-1">
                     <p className="font-semibold text-sm">
                       Họ và tên: {student.name}
                     </p>
                     <div className="flex justify-between text-sm text-gray-700">
                       <span>
-                        Điểm đón:{" "}
-                        {student.pickup_point?.name || "Đang cập nhật"}
+                        Điểm đón: {student.pickup_point.name || "Đang cập nhật"}
                       </span>
                       <span>
-                        Điểm trả:{" "}
-                        {student.dropoff_point?.name || "Đang cập nhật"}
+                        Điểm trả: {student.dropoff_point.name || "Đang cập nhật"}
                       </span>
                     </div>
                   </div>
