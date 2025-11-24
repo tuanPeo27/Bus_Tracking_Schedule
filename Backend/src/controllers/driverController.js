@@ -1,6 +1,9 @@
 const bcrypt = require("bcryptjs");
 
 const User = require("../models/user");
+const Schedule = require("../models/schedule");
+const Bus = require("../models/bus");
+const Route = require("../models/route");
 
 exports.getAllDrivers = async (req, res) => {
   try {
@@ -32,10 +35,33 @@ exports.getDriverById = async (req, res) => {
         .status(404)
         .json({ EC: 1, EM: "Tài xế không tồn tại.", DT: null });
     }
+
+    const schedules = await Schedule.findAll({
+      where: { driver_id: driverId },
+      include: [
+        {
+          model: Bus,
+          attributes: ["id", "license_plate"],
+        },
+        {
+          model: Route,
+          attributes: ["id", "name", "start_point", "end_point"],
+        },
+      ],
+    });
+
+    if (schedules.length === 0) {
+      return res.status(200).json({
+        EC: 0,
+        EM: "Không tìm thấy lịch trình cho tài xế.",
+        DT: driver,
+      });
+    }
+
     res.status(200).json({
       EC: 0,
       EM: "Lấy thông tin tài xế thành công.",
-      DT: driver,
+      DT: { driver, schedules },
     });
   } catch (error) {
     console.error("Lỗi lấy thông tin tài xế:", error);
