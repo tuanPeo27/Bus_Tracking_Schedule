@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+
 import { Textarea } from "../ui/textarea";
 import {
   Select,
@@ -13,6 +14,7 @@ import {
 import { Label } from "../ui/label";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import {
+
   MessageSquare,
   Send,
   Users,
@@ -23,15 +25,18 @@ import {
 import socket from "../../setup/socket";
 import { useNotificationHelpers } from "../useNotificationHelpers";
 import { getAllParent, getAllDriver } from "../../service/adminService";
-
-export default function ManagerMessages() {
+import { useIsMobile } from "../ui/use-mobile";
+export default function ManagerMessages({ adminId,
+  notificationsList,
+  setNotificationsList, }) {
   const { showSuccess, showError, showInfo } = useNotificationHelpers();
   const [selectedRecipient, setSelectedRecipient] = useState("");
   const [specificRecipient, setSpecificRecipient] = useState("");
   const [recipientCategory, setRecipientCategory] = useState("driver"); // "driver" | "parent"
   const [messageType, setMessageType] = useState("info");
   const [message, setMessage] = useState("");
-
+  const isMobile = useIsMobile();
+  const [searchTerm, setSearchTerm] = useState("");
   const [driversList, setDriversList] = useState([]);
   const [parentsList, setParentsList] = useState([]);
 
@@ -42,6 +47,7 @@ export default function ManagerMessages() {
         const [pRes, dRes] = await Promise.all([getAllParent(), getAllDriver()]);
         const parents = (pRes?.data?.DT) || (pRes?.data) || [];
         const drivers = (dRes?.data?.DT) || (dRes?.data) || [];
+        console.log("Lấy danh sách parents/drivers:", { parents, drivers });
         if (!mounted) return;
         setParentsList(Array.isArray(parents) ? parents : []);
         setDriversList(Array.isArray(drivers) ? drivers : []);
@@ -52,36 +58,6 @@ export default function ManagerMessages() {
     return () => { mounted = false; };
   }, []);
 
-  const recentMessages = [
-    {
-      id: 1,
-      recipient: "Tất cả tài xế",
-      recipientType: "drivers",
-      type: "urgent",
-      content: "Thay đổi lịch trình khẩn cấp cho ngày mai do thời tiết xấu.",
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      status: "sent",
-    },
-    {
-      id: 2,
-      recipient: "Nguyễn Văn Minh",
-      recipientType: "driver",
-      type: "info",
-      content: "Anh vui lòng kiểm tra áp suất lốp xe trước khi bắt đầu ca.",
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      status: "delivered",
-    },
-    {
-      id: 3,
-      recipient: "Phụ huynh Tuyến 1",
-      recipientType: "parents",
-      type: "reminder",
-      content:
-        "Xe buýt sẽ đến điểm đón trong 10 phút. Vui lòng chuẩn bị sẵn sàng.",
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-      status: "delivered",
-    },
-  ];
 
   const handleSendMessage = () => {
     if (!message.trim() || !selectedRecipient) return;
@@ -143,9 +119,9 @@ export default function ManagerMessages() {
         emitWithAck({ target: "all_drivers", ...payload }, "Đã gửi cho tất cả tài xế");
       } else if (selectedRecipient === "specific") {
         if (recipientCategory === "driver") {
-          emitWithAck({ target: "driver", driverId: specificRecipient, ...payload }, "Đã gửi cho tài xế");
+          emitWithAck({ target: specificRecipient, ...payload }, "Đã gửi cho tài xế");
         } else {
-          emitWithAck({ target: "parent", parentId: specificRecipient, ...payload }, "Đã gửi cho phụ huynh");
+          emitWithAck({ target: specificRecipient, ...payload }, "Đã gửi cho phụ huynh");
           // fallback emit trực tiếp event parent-notify-<id> để tăng xác suất nhận (server có thể chuyển tiếp)
           try {
             socket.emit(`parent-notify-${specificRecipient}`, payload);
@@ -169,27 +145,8 @@ export default function ManagerMessages() {
     // keep existing confirmation minimal (socket callbacks above also notify)
   };
 
-  const getMessageTypeColor = (type) => {
-    switch (type) {
-      case "urgent":
-        return "text-red-600 bg-red-50";
-      case "reminder":
-        return "text-yellow-600 bg-yellow-50";
-      default:
-        return "text-blue-600 bg-blue-50";
-    }
-  };
 
-  const getRecipientIcon = (type) => {
-    switch (type) {
-      case "drivers":
-        return <Users className="w-4 h-4 text-green-600" />;
-      case "parents":
-        return <Users className="w-4 h-4 text-purple-600" />;
-      default:
-        return <User className="w-4 h-4 text-blue-600" />;
-    }
-  };
+
 
   const formatTimestamp = (date) => {
     const now = new Date();
@@ -201,6 +158,32 @@ export default function ManagerMessages() {
     return `${hours} giờ trước`;
   };
 
+
+  useEffect(() => {
+    const stored = localStorage.getItem(`notifications_${adminId}`);
+    if (stored) {
+      try {
+        setNotificationsList(JSON.parse(stored));
+      } catch {
+        console.error("Lỗi parse JSON notifications");
+      }
+    }
+  }, [adminId, setNotificationsList]);
+
+  /** Mỗi khi danh sách thay đổi → lưu vào localStorage */
+  useEffect(() => {
+    localStorage.setItem(
+      `notifications_${adminId}`,
+      JSON.stringify(notificationsList)
+    );
+  }, [notificationsList, adminId]);
+
+
+  const filteredNotifications = notificationsList.filter(
+    (n) =>
+      (n.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (n.content || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
   return (
     <div className="space-y-6">
       {/* Send Message Form */}
@@ -212,7 +195,7 @@ export default function ManagerMessages() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-1 gap-4">
             <div>
               <Label>Người nhận</Label>
               <Select
@@ -266,19 +249,6 @@ export default function ManagerMessages() {
               </>
             )}
 
-            <div>
-              <Label>Loại tin nhắn</Label>
-              <Select value={messageType} onValueChange={setMessageType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="info">Thông tin thường</SelectItem>
-                  <SelectItem value="urgent">Khẩn cấp</SelectItem>
-                  <SelectItem value="reminder">Nhắc nhở</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <div>
@@ -310,48 +280,40 @@ export default function ManagerMessages() {
       {/* Recent Messages */}
       <Card>
         <CardHeader>
-          <CardTitle>Tin nhắn gần đây</CardTitle>
+          <CardTitle>Thông báo gần đây</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {recentMessages.map((msg) => (
-              <div key={msg.id} className="p-4 border rounded-lg">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    {getRecipientIcon(msg.recipientType)}
-                    <div>
-                      <p className="font-medium">{msg.recipient}</p>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-xs px-2 py-1 rounded ${getMessageTypeColor(
-                            msg.type
-                          )}`}
-                        >
-                          {msg.type === "urgent"
-                            ? "Khẩn cấp"
-                            : msg.type === "reminder"
-                              ? "Nhắc nhở"
-                              : "Thông tin"}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatTimestamp(msg.timestamp)}
-                        </span>
-                      </div>
+          {/* Alerts and Notifications */}
+          <div className={`space-y-${isMobile ? "3" : "4"}`}>
+            {filteredNotifications.map((n) => (
+              <Card
+                key={n.id}
+                className={`transition-colors duration-200 ${!n.isRead ? "bg-blue-50" : "bg-white"
+                  } hover:bg-blue-100 shadow-sm`}
+              >
+                <CardContent className="flex justify-between items-start gap-3 p-4">
+                  <div className="flex gap-3 flex-1 items-start">
+                    {getNotificationIcon(n.type)}
+
+                    <div className="flex flex-col gap-1">
+                      <p className="font-medium text-gray-800">{n.title}</p>
+                      <p className="text-sm text-gray-600">{n.content}</p>
+                      <p className="text-xs text-gray-400">
+                        {formatTimestamp(n.timestamp)}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {msg.status === "sent" && (
-                      <span className="text-xs text-blue-600">Đã gửi</span>
-                    )}
-                    {msg.status === "delivered" && (
-                      <span className="text-xs text-green-600">Đã nhận</span>
-                    )}
-                  </div>
-                </div>
-
-                <p className="text-sm leading-relaxed">{msg.content}</p>
-              </div>
+                </CardContent>
+              </Card>
             ))}
+
+            {/* Empty state */}
+            {filteredNotifications.length === 0 && (
+              <Card className="text-center py-8">
+                <Bell className="w-10 h-10 mx-auto text-gray-400 mb-2" />
+                <p className="text-gray-500">Không có thông báo phù hợp</p>
+              </Card>
+            )}
           </div>
         </CardContent>
       </Card>

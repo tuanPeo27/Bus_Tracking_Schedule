@@ -141,6 +141,8 @@ const deleteRoute = async (idRoute) => {
     return instance.delete(`routes/delete/${idRoute}`);
 }
 
+
+
 export {
     deleteRoute,
     updateRoute,
