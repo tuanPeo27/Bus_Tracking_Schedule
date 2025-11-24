@@ -28,7 +28,7 @@ import {
 
 export function ParentApp({ onBack }) {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const { showInfo } = useNotificationHelpers();
+  const { showSuccess, system } = useNotificationHelpers();
   const { clearAll } = useNotifications();
   const isMobile = useIsMobile();
 
@@ -136,7 +136,7 @@ export function ParentApp({ onBack }) {
       });
 
       // TOAST
-      showInfo(newNotification.title, newNotification.content);
+      showSuccess(newNotification.title, newNotification.content);
     };
 
     socket.on(`parent-notify-${parentInfo.id}`, handleNotification);
