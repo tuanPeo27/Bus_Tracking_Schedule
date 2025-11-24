@@ -55,6 +55,47 @@ exports.editBusStop = async (req, res) => {
   }
 };
 
+exports.editStatusBusStop = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const stop = await BusStop.findByPk(id);
+    if (!stop)
+      return res.status(404).json({ EC: 1, EM: "Không tìm thấy điểm dừng" });
+
+    await stop.update(req.body);
+    res
+      .status(200)
+      .json({ EC: 0, EM: "Cập nhật tràng thái điểm dừng", DT: stop });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ EC: -1, EM: "Lỗi khi cập nhật tràng thái điểm dừng" });
+  }
+};
+
+exports.editAllStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const stops = await BusStop.findAll({
+      where: { route_id: id },
+    });
+    // console.log(stops);
+    await Promise.all(
+      stops.map(async (stop) => {
+        await stop.update(req.body);
+      })
+    );
+    res
+      .status(200)
+      .json({ EC: 0, EM: "Cập nhật trạng thái điểm dừng", DT: stops });
+  } catch (error) {
+    console.log(error);
+    res
+      .status(500)
+      .json({ EC: -1, EM: "Lỗi khi cập nhật trạng thái điểm dừng" });
+  }
+};
+
 exports.deleteBusStop = async (req, res) => {
   try {
     const { id } = req.params;

@@ -2,6 +2,7 @@ const Route = require("../models/route");
 const Schedule = require("../models/schedule");
 const Student = require("../models/student");
 const Parent = require("../models/user");
+const BusStop = require("../models/busStop");
 
 exports.getAllStudents = async (req, res) => {
   try {
@@ -11,8 +12,8 @@ exports.getAllStudents = async (req, res) => {
         "name",
         "age",
         "school",
-        "pickup_point",
-        "dropoff_point",
+        "pickup_point_id",
+        "dropoff_point_id",
         "parent_id",
         "route_id",
       ],
@@ -39,8 +40,8 @@ exports.getStudentsByRouteId = async (req, res) => {
         "name",
         "age",
         "school",
-        "pickup_point",
-        "dropoff_point",
+        "pickup_point_id",
+        "dropoff_point_id",
         "parent_id",
         "route_id",
       ],
@@ -59,17 +60,37 @@ exports.getStudentsByRouteId = async (req, res) => {
 exports.getStudentsByParentId = async (req, res) => {
   try {
     const parentId = req.params.id;
+
+    const parent = await Parent.findByPk(parentId);
+    if (!parent) {
+      return res
+        .status(404)
+        .json({ EC: 1, EM: "Không tìm thấy phụ huynh.", DT: null });
+    }
+
     const students = await Student.findAll({
       where: { parent_id: parentId },
-      attributes: [
-        "id",
-        "name",
-        "age",
-        "school",
-        "pickup_point",
-        "dropoff_point",
+      attributes: ["id", "name", "age", "school"],
+      include: [
+        {
+          model: BusStop,
+          as: "pickup_point",
+          attributes: ["id", "name", "latitude", "longitude"],
+        },
+        {
+          model: BusStop,
+          as: "dropoff_point",
+          attributes: ["id", "name", "latitude", "longitude"],
+        },
       ],
     });
+
+    if (students.length === 0) {
+      return res
+        .status(404)
+        .json({ EC: 1, EM: "Không tìm thấy học sinh.", DT: null });
+    }
+
     res.status(200).json({
       EC: 0,
       EM: "Lấy danh sách học sinh theo phụ huynh thành công.",
@@ -87,8 +108,8 @@ exports.createStudent = async (req, res) => {
       name,
       age,
       school,
-      pickup_point,
-      dropoff_point,
+      pickup_point_id,
+      dropoff_point_id,
       parent_id,
       route_id,
     } = req.body;
@@ -97,8 +118,8 @@ exports.createStudent = async (req, res) => {
       !name ||
       !age ||
       !school ||
-      !pickup_point ||
-      !dropoff_point ||
+      !pickup_point_id ||
+      !dropoff_point_id ||
       !parent_id ||
       !route_id
     ) {
@@ -121,12 +142,26 @@ exports.createStudent = async (req, res) => {
         .json({ EC: 1, EM: "Tuyến đường không tìm thấy.", DT: null });
     }
 
+    const pickup = await BusStop.findByPk(pickup_point_id);
+    if (!pickup) {
+      return res
+        .status(404)
+        .json({ EC: 1, EM: "Điểm dừng không tồn tại.", DT: null });
+    }
+
+    const dropoff = await BusStop.findByPk(dropoff_point_id);
+    if (!dropoff) {
+      return res
+        .status(404)
+        .json({ EC: 1, EM: "Điểm dừng không tồn tại.", DT: null });
+    }
+
     const student = await Student.create({
       name,
       age,
       school,
-      pickup_point,
-      dropoff_point,
+      pickup_point_id,
+      dropoff_point_id,
       parent_id,
       route_id,
     });
@@ -162,7 +197,7 @@ exports.editStudent = async (req, res) => {
 exports.editStudentById = async (req, res) => {
   try {
     const studentId = req.params.id;
-    const { name, age, school, pickup_point, dropoff_point } = req.body;
+    const { name, age, school, pickup_point_id, dropoff_point_id } = req.body;
     const student = await Student.findOne({
       where: { id: studentId },
     });
@@ -174,8 +209,8 @@ exports.editStudentById = async (req, res) => {
     student.name = name || student.name;
     student.age = age || student.age;
     student.school = school || student.school;
-    student.pickup_point = pickup_point || student.pickup_point;
-    student.dropoff_point = dropoff_point || student.dropoff_point;
+    student.pickup_point_id = pickup_point_id || student.pickup_point_id;
+    student.dropoff_point_id = dropoff_point_id || student.dropoff_point_id;
     await student.save();
     res.status(200).json({
       EC: 0,
@@ -225,7 +260,7 @@ exports.deleteStudentById = async (req, res) => {
 exports.getStudentsByScheduleId = async (req, res) => {
   try {
     const scheduleId = req.params.id;
-    console.log("🔍 Lấy danh sách học sinh theo lịch trình:", scheduleId);
+    console.log("Lấy danh sách học sinh theo lịch trình:", scheduleId);
 
     const schedule = await Schedule.findOne({
       where: { id: scheduleId },
@@ -247,8 +282,9 @@ exports.getStudentsByScheduleId = async (req, res) => {
         "name",
         "age",
         "school",
-        "pickup_point",
-        "dropoff_point",
+        "pickup_point_id",
+        "dropoff_point_id",
+        "parent_id",
       ],
       order: [["name", "ASC"]],
     });
