@@ -1,4 +1,4 @@
-import React from "react";
+import React ,{useMemo} from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Progress } from "../ui/progress";
@@ -23,6 +23,12 @@ export default function DriverDashboard({ driverInfo, currentVehicle}) {
       </div>
     );
   }
+
+  const sortedSchedules = useMemo(() => {
+    return [...driverInfo.schedules].sort(
+      (a, b) => a.start_time.localeCompare(b.start_time)
+    );
+  }, [driverInfo]);
 
   // const currentSchedule = {
   //   id: "LT001",
@@ -49,59 +55,27 @@ export default function DriverDashboard({ driverInfo, currentVehicle}) {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <span className="font-medium min-w-[100px]">Họ tên:</span>
-                <span>{driverInfo?.username || "—"}</span>
+                <span>{driverInfo?.driver.username || "—"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-medium min-w-[100px]">Mã tài xế:</span>
-                <Badge variant="outline">{driverInfo?.id || "—"}</Badge>
+                <Badge variant="outline">{driverInfo?.driver.id || "—"}</Badge>
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4" />
                 <span className="font-medium min-w-[100px]">Điện thoại:</span>
-                <span>{driverInfo?.phone_number || "—"}</span>
+                <span>{driverInfo?.driver.phone_number || "—"}</span>
               </div>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <span className="font-medium min-w-[100px]">Địa chỉ:</span>
-                <span>{driverInfo?.address || "—"}</span>
+                <span>{driverInfo?.driver.address || "—"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-medium min-w-[100px]">Giới tính:</span>
-                <span>{driverInfo?.sex || "—"}</span>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Xe đang phụ trách */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bus className="w-5 h-5" />
-            Xe đang phụ trách
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="font-medium min-w-[100px]">Biển số:</span>
-                <Badge className="bg-blue-100 text-blue-800">
-                  {currentVehicle?.bus.license_plate || "—"}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-medium min-w-[100px]">Hãng xe:</span>
-                <span>{currentVehicle?.bus.brand || "—"}</span>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="font-medium min-w-[100px]">Số ghế:</span>
-                <span>{currentVehicle?.bus.seats || "—"} chỗ</span>
+                <span>{driverInfo?.driver.sex || "—"}</span>
               </div>
             </div>
           </div>
@@ -113,29 +87,51 @@ export default function DriverDashboard({ driverInfo, currentVehicle}) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5" />
-            Lịch trình hiện tại
+            Lịch trình được phân công
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Thời gian:</span>
-              <span>
-                {currentVehicle.schedule.start_time} - {currentVehicle.schedule.end_time}
-              </span>
-            </div>
-            <Badge className="bg-green-100 text-green-800">Đang hoạt động</Badge>
-          </div>
 
-          <div className="flex items-start gap-2">
-            <Route className="w-4 h-4 mt-1" />
-            <div>
-              <span className="font-medium">Tuyến đường:</span>
-              <p className="text-sm text-muted-foreground mt-1">
-                {currentVehicle.route.name + ": " + currentVehicle.route.start_point + " - " + currentVehicle.route.end_point}
-              </p>
+          {sortedSchedules.map((sch, index) => (
+            <div
+              key={sch.id || index}
+              className="p-4 border rounded-lg space-y-3 bg-gray-50"
+            >
+              <div className="flex items-center justify-between">
+                <div className="font-medium">
+                  Ngày: {sch.date}
+                </div>
+                {/* <Badge className="bg-green-100 text-green-800">
+                  {sch.status || "scheduled"}
+                </Badge> */}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Thời gian:</span>
+                <span>
+                  {sch.start_time} - {sch.end_time}
+                </span>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <Route className="w-4 h-4 mt-1" />
+                <div>
+                  <span className="font-medium">Tuyến đường:</span>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Tuyến: {sch.Route?.name || "Không rõ"} <br />
+                    Lộ trình: {sch.Route?.start_point} → {sch.Route?.end_point} <br />
+                    Xe buýt: {sch.Bus?.license_plate}
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
+          ))}
+
+          {sortedSchedules.length === 0 && (
+            <div className="text-center text-gray-500">
+              Chưa có lịch trình phân công
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

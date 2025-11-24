@@ -50,6 +50,7 @@ export function DriverApp({ onBack }) {
     try {
       const res = await getInfoDriver(Cookies.get("user_id"));
       if (res && res.data.EC === 0) {
+        console.log("res.data", res.data);
         setDriverInfo(res.data.DT);
         console.log("Thông tin tài xế:", res.data.DT);
       } else {
@@ -150,7 +151,7 @@ export function DriverApp({ onBack }) {
               </h1>
               {!isMobile && (
                 <p className="text-sm text-muted-foreground">
-                  Chào mừng, {driverInfo?.username || "Đang tải..."}
+                  Chào mừng, {driverInfo?.driver.username || "Đang tải..."}
                 </p>
               )}
             </div>
@@ -241,7 +242,7 @@ export function DriverApp({ onBack }) {
             <DriverDashboard
               driverInfo={driverInfo}
               currentVehicle={currentVehicle}
-              driverStatus={driverStatus}
+
             />
           </AnimatedTabsContent>
 
@@ -263,8 +264,8 @@ export function DriverApp({ onBack }) {
                   schedule_id={activeSchedule?.id}
                   route_id={activeSchedule?.route?.id || activeSchedule?.route_id}
                   // some API return vehicle nested under `bus`, so prefer that if present
-                  vehicle_id={currentVehicle?.bus?.id || currentVehicle?.id}
-                  vehicle={currentVehicle?.bus || currentVehicle}
+                  vehicle_id={activeSchedule?.bus?.id || currentVehicle?.id}
+                  vehicle={activeSchedule?.bus || currentVehicle}
                 />
               </AnimatedTabsContent>
             </>

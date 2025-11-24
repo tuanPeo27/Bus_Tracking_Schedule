@@ -715,7 +715,7 @@ export default function ManagerRoutes() {
                     name: e.target.value,
                   }))
                 }
-                placeholder="VD: 29A-12345"
+                placeholder="VD: Tuyến số 1"
               />
             </div>
 
@@ -727,7 +727,7 @@ export default function ManagerRoutes() {
                 onChange={(e) =>
                   setNewRoute((prev) => ({ ...prev, start_point: e.target.value }))
                 }
-                placeholder="VD: Hyundai"
+                placeholder="VD: Đại học Sài Gòn"
               />
             </div>
 
@@ -739,7 +739,7 @@ export default function ManagerRoutes() {
                 onChange={(e) =>
                   setNewRoute((prev) => ({ ...prev, end_point: e.target.value }))
                 }
-                placeholder="VD: Universe"
+                placeholder="VD: Bến xe Quận 8"
               />
             </div>
 
