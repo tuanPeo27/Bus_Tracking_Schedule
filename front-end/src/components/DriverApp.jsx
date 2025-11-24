@@ -262,7 +262,9 @@ export function DriverApp({ onBack }) {
                 <DriverGPS
                   schedule_id={activeSchedule?.id}
                   route_id={activeSchedule?.route?.id || activeSchedule?.route_id}
-                  vehicle_id={currentVehicle?.id}
+                  // some API return vehicle nested under `bus`, so prefer that if present
+                  vehicle_id={currentVehicle?.bus?.id || currentVehicle?.id}
+                  vehicle={currentVehicle?.bus || currentVehicle}
                 />
               </AnimatedTabsContent>
             </>

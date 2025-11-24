@@ -4,7 +4,15 @@ import "leaflet/dist/leaflet.css";
 
 const apiKey = "2b833a5c3c1649d89c2e52d7976c7534";
 
-export function LeafletMap({ height, center, zoom = 13, markers = [], className, polylines = [], onMapClick = null }) {
+export function LeafletMap({
+  height,
+  center,
+  zoom = 13,
+  markers = [],
+  className,
+  polylines = [],
+  onMapClick = null,
+}) {
   const mapRef = useRef(null);
   const markerGroupRef = useRef(null);
   const polylineGroupRef = useRef(null);
@@ -13,9 +21,10 @@ export function LeafletMap({ height, center, zoom = 13, markers = [], className,
   const fallback = { lat: 10.8231, lng: 106.6297 };
 
   useEffect(() => {
-    const initCenter = center && center.lat !== undefined && center.lng !== undefined
-      ? [center.lat, center.lng]
-      : [fallback.lat, fallback.lng];
+    const initCenter =
+      center && center.lat !== undefined && center.lng !== undefined
+        ? [center.lat, center.lng]
+        : [fallback.lat, fallback.lng];
 
     if (!mapRef.current) {
       const el = document.getElementById("geoapify-map");
@@ -43,8 +52,11 @@ export function LeafletMap({ height, center, zoom = 13, markers = [], className,
       mapRef.current.on("dragstart", () => setIsFollowing(false));
       mapRef.current.on("click", (e) => {
         try {
-          if (typeof onMapClick === "function") onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
-        } catch (err) { /* ignore */ }
+          if (typeof onMapClick === "function")
+            onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
+        } catch (err) {
+          /* ignore */
+        }
       });
     }
   }, []);
@@ -53,19 +65,25 @@ export function LeafletMap({ height, center, zoom = 13, markers = [], className,
     if (!mapRef.current) return;
 
     // --- Cập nhật markers ---
-    if (!markerGroupRef.current) markerGroupRef.current = L.layerGroup().addTo(mapRef.current);
+    if (!markerGroupRef.current)
+      markerGroupRef.current = L.layerGroup().addTo(mapRef.current);
     markerGroupRef.current.clearLayers();
     (markers || []).forEach((marker) => {
       if (!marker || !marker.position) return;
 
       let leafletMarker = L.marker([marker.position.lat, marker.position.lng], {
         draggable: marker.draggable || false, // <-- thêm draggable
-      }).addTo(markerGroupRef.current)
+      })
+        .addTo(markerGroupRef.current)
         .bindPopup(marker.title || "");
 
       if (marker.onClick && typeof marker.onClick === "function") {
         leafletMarker.on("click", (e) => {
-          try { marker.onClick(marker); } catch (err) { /* ignore */ }
+          try {
+            marker.onClick(marker);
+          } catch (err) {
+            /* ignore */
+          }
         });
       }
 
@@ -79,7 +97,8 @@ export function LeafletMap({ height, center, zoom = 13, markers = [], className,
     });
 
     // --- Cập nhật polylines ---
-    if (!polylineGroupRef.current) polylineGroupRef.current = L.layerGroup().addTo(mapRef.current);
+    if (!polylineGroupRef.current)
+      polylineGroupRef.current = L.layerGroup().addTo(mapRef.current);
     polylineGroupRef.current.clearLayers();
     (polylines || []).forEach((pline) => {
       const latlngs = (pline.positions || []).map((p) => [p.lat, p.lng]);
@@ -94,12 +113,25 @@ export function LeafletMap({ height, center, zoom = 13, markers = [], className,
     });
 
     // --- Pan theo xe nếu isFollowing ---
-    if (isFollowing && center && center.lat !== undefined && center.lng !== undefined) {
+    if (
+      isFollowing &&
+      center &&
+      center.lat !== undefined &&
+      center.lng !== undefined
+    ) {
       const currentCenter = mapRef.current.getCenter();
-      const distance = mapRef.current.distance(currentCenter, L.latLng(center.lat, center.lng));
+      const distance = mapRef.current.distance(
+        currentCenter,
+        L.latLng(center.lat, center.lng)
+      );
       if (distance > 50) mapRef.current.panTo([center.lat, center.lng]);
     }
-
   }, [center, markers, polylines, isFollowing]);
-  return <div id="geoapify-map" className={className} style={{ width: "100%", height }} />;
+  return (
+    <div
+      id="geoapify-map"
+      className={className}
+      style={{ width: "100%", height }}
+    />
+  );
 }
