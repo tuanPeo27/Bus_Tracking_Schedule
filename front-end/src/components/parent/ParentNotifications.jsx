@@ -4,105 +4,54 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { useIsMobile } from "../ui/use-mobile";
-import socket from "../../setup/socket";
 import { Bell, Bus, AlertTriangle, Clock, Info, X } from "lucide-react";
-import { useNotificationHelpers } from "../useNotificationHelpers"; // toast system
 
-export function ParentNotifications({ parentId }) {
+export function ParentNotifications({
+  parentId,
+  notificationsList,
+  setNotificationsList,
+}) {
   const isMobile = useIsMobile();
-  const { showSuccess, showError, showInfo, showWarning } =
-    useNotificationHelpers();
-
-  const [notificationsList, setNotificationsList] = useState(() => {
-    const saved = localStorage.getItem(`notifications_${parentId}`);
-    return saved ? JSON.parse(saved) : [];
-  });
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Lắng nghe realtime
+  /** Load dữ liệu khi mount */
   useEffect(() => {
-    if (!parentId) return;
-
-    socket.emit("joinParentRoom", { parentId });
-
-    const handleNotification = (notification) => {
-      const newNotification = {
-        id: Date.now(),
-        title: notification?.title || "Thông báo mới",
-        content:
-          typeof notification === "string"
-            ? notification
-            : notification?.message || "Không có nội dung",
-        timestamp: new Date(),
-        isRead: false,
-        type: notification?.type || "info",
-      };
-
-      // Hiện toast
-      switch (newNotification.type) {
-        case "success":
-        case "arrival":
-          showSuccess(newNotification.title, newNotification.content);
-          break;
-        case "warning":
-        case "schedule_change":
-          showWarning(newNotification.title, newNotification.content);
-          break;
-        case "error":
-        case "delay":
-          showError(newNotification.title, newNotification.content);
-          break;
-        default:
-          showInfo(newNotification.title, newNotification.content);
+    const stored = localStorage.getItem(`notifications_${parentId}`);
+    if (stored) {
+      try {
+        setNotificationsList(JSON.parse(stored));
+      } catch {
+        console.error("Lỗi parse JSON notifications");
       }
+    }
+  }, [parentId, setNotificationsList]);
 
-      // Lưu và cập nhật list
-      setNotificationsList((prev) => {
-        const updated = [newNotification, ...prev];
-        localStorage.setItem(
-          `notifications_${parentId}`,
-          JSON.stringify(updated)
-        );
-        return updated;
-      });
-    };
+  /** Mỗi khi danh sách thay đổi → lưu vào localStorage */
+  useEffect(() => {
+    localStorage.setItem(
+      `notifications_${parentId}`,
+      JSON.stringify(notificationsList)
+    );
+  }, [notificationsList, parentId]);
 
-    socket.on(`parent-notify-${parentId}`, handleNotification);
-
-    return () => {
-      socket.emit("leaveParentRoom", { parentId });
-      socket.off(`parent-notify-${parentId}`, handleNotification);
-    };
-  }, [parentId]);
-
+  /** Đánh dấu đã đọc */
   const handleMarkAsRead = (id) => {
     setNotificationsList((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
     );
   };
 
+  /** Đọc tất cả */
   const handleMarkAllAsRead = () => {
-    setNotificationsList((prev) => {
-      const updated = prev.map((n) => ({ ...n, isRead: true }));
-      localStorage.setItem(
-        `notifications_${parentId}`,
-        JSON.stringify(updated)
-      );
-      return updated;
-    });
+    setNotificationsList((prev) => prev.map((n) => ({ ...n, isRead: true })));
   };
 
+  /** Xóa 1 thông báo */
   const handleDeleteNotification = (id) => {
-    setNotificationsList((prev) => {
-      const updated = prev.filter((n) => n.id !== id);
-      localStorage.setItem(
-        `notifications_${parentId}`,
-        JSON.stringify(updated)
-      );
-      return updated;
-    });
+    setNotificationsList((prev) => prev.filter((n) => n.id !== id));
   };
 
+  /** Xóa tất cả */
   const handleDeleteAll = () => {
     setNotificationsList([]);
     localStorage.removeItem(`notifications_${parentId}`);
@@ -110,12 +59,14 @@ export function ParentNotifications({ parentId }) {
 
   const unreadCount = notificationsList.filter((n) => !n.isRead).length;
 
+  /** Lọc thông báo */
   const filteredNotifications = notificationsList.filter(
     (n) =>
-      n.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      n.content?.toLowerCase().includes(searchTerm.toLowerCase())
+      (n.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (n.content || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  /** Icon cho từng loại thông báo */
   const getNotificationIcon = (type) => {
     switch (type) {
       case "arrival":
@@ -129,13 +80,21 @@ export function ParentNotifications({ parentId }) {
     }
   };
 
+  /** Format thời gian */
   const formatTimestamp = (timestamp) => {
+    const time = new Date(timestamp);
+    if (isNaN(time)) return "N/A";
+
     const now = new Date();
-    const diff = now - new Date(timestamp);
+    const diff = now - time;
     const minutes = Math.floor(diff / 60000);
+
+    if (minutes < 1) return "Vừa xong";
     if (minutes < 60) return `${minutes} phút trước`;
+
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours} giờ trước`;
+
     const days = Math.floor(hours / 24);
     return `${days} ngày trước`;
   };
@@ -197,6 +156,7 @@ export function ParentNotifications({ parentId }) {
             <CardContent className="flex justify-between items-start gap-3 p-4">
               <div className="flex gap-3 flex-1 items-start">
                 {getNotificationIcon(n.type)}
+
                 <div className="flex flex-col gap-1">
                   <p className="font-medium text-gray-800">{n.title}</p>
                   <p className="text-sm text-gray-600">{n.content}</p>
@@ -205,6 +165,7 @@ export function ParentNotifications({ parentId }) {
                   </p>
                 </div>
               </div>
+
               <div className="flex flex-col gap-2 items-end">
                 {!n.isRead && (
                   <Button
@@ -215,6 +176,7 @@ export function ParentNotifications({ parentId }) {
                     Đã đọc
                   </Button>
                 )}
+
                 <Button
                   size="sm"
                   variant="ghost"
@@ -227,6 +189,7 @@ export function ParentNotifications({ parentId }) {
           </Card>
         ))}
 
+        {/* Empty state */}
         {filteredNotifications.length === 0 && (
           <Card className="text-center py-8">
             <Bell className="w-10 h-10 mx-auto text-gray-400 mb-2" />

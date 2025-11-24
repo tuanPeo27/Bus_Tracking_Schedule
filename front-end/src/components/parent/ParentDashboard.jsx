@@ -11,10 +11,9 @@ export function ParentDashboard({ parentInfo, studentInfo, routeInfo }) {
     return Array.isArray(studentInfo)
       ? studentInfo
       : studentInfo
-        ? [studentInfo]
-        : [];
+      ? [studentInfo]
+      : [];
   }, [studentInfo]);
-
   const routes = React.useMemo(() => {
     return Array.isArray(routeInfo) ? routeInfo : routeInfo ? [routeInfo] : [];
   }, [routeInfo]);
@@ -36,7 +35,9 @@ export function ParentDashboard({ parentInfo, studentInfo, routeInfo }) {
               </AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="font-medium">Username: {parent?.username || "—"}</h3>
+              <h3 className="font-medium">
+                Username: {parent?.username || "—"}
+              </h3>
               <p className="text-sm text-muted-foreground">
                 Mã phụ huynh: {parent?.id || "—"}
               </p>
@@ -70,8 +71,8 @@ export function ParentDashboard({ parentInfo, studentInfo, routeInfo }) {
                       Tên: student.name,
                       Lớp: student.class || "12C1",
                       Trường: student.school,
-                      "Điểm đi": student.pickup_point,
-                      "Điểm đến": student.dropoff_point,
+                      "Điểm đi": student.pickup_point.name,
+                      "Điểm đến": student.dropoff_point.name,
                     }).map(([label, value]) => (
                       <div
                         className="flex items-center justify-between"
@@ -125,6 +126,5 @@ export function ParentDashboard({ parentInfo, studentInfo, routeInfo }) {
         <p className="text-muted-foreground">Chưa có thông tin học sinh</p>
       )}
     </div>
-
   );
 }

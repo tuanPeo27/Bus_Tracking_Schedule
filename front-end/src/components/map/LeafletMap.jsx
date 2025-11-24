@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 
 const apiKey = "2b833a5c3c1649d89c2e52d7976c7534";
 
-export function LeafletMap({ height, center, zoom = 13, markers = [], className, polylines = [] }) {
+export function LeafletMap({ height, center, zoom = 13, markers = [], className, polylines = [], onMapClick = null }) {
   const mapRef = useRef(null);
   const markerGroupRef = useRef(null);
   const polylineGroupRef = useRef(null);
@@ -41,6 +41,11 @@ export function LeafletMap({ height, center, zoom = 13, markers = [], className,
       polylineGroupRef.current = L.layerGroup().addTo(mapRef.current);
 
       mapRef.current.on("dragstart", () => setIsFollowing(false));
+      mapRef.current.on("click", (e) => {
+        try {
+          if (typeof onMapClick === "function") onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
+        } catch (err) { /* ignore */ }
+      });
     }
   }, []);
 
@@ -53,18 +58,24 @@ export function LeafletMap({ height, center, zoom = 13, markers = [], className,
     (markers || []).forEach((marker) => {
       if (!marker || !marker.position) return;
 
-  let leafletMarker = L.marker([marker.position.lat, marker.position.lng], {
-    draggable: marker.draggable || false, // <-- thêm draggable
-  }).addTo(markerGroupRef.current)
-    .bindPopup(marker.title || "");
+      let leafletMarker = L.marker([marker.position.lat, marker.position.lng], {
+        draggable: marker.draggable || false, // <-- thêm draggable
+      }).addTo(markerGroupRef.current)
+        .bindPopup(marker.title || "");
 
-  // Nếu có callback onDrag, dùng event
-  if (marker.draggable && marker.onDrag) {
-    leafletMarker.on("dragend", (e) => {
-      const pos = e.target.getLatLng();
-      marker.onDrag({ lat: pos.lat, lng: pos.lng });
-    });
-  }
+      if (marker.onClick && typeof marker.onClick === "function") {
+        leafletMarker.on("click", (e) => {
+          try { marker.onClick(marker); } catch (err) { /* ignore */ }
+        });
+      }
+
+      // Nếu có callback onDrag, dùng event
+      if (marker.draggable && marker.onDrag) {
+        leafletMarker.on("dragend", (e) => {
+          const pos = e.target.getLatLng();
+          marker.onDrag({ lat: pos.lat, lng: pos.lng });
+        });
+      }
     });
 
     // --- Cập nhật polylines ---
@@ -90,5 +101,5 @@ export function LeafletMap({ height, center, zoom = 13, markers = [], className,
     }
 
   }, [center, markers, polylines, isFollowing]);
-return <div id="geoapify-map" className={className} style={{ width: "100%", height }} />;
+  return <div id="geoapify-map" className={className} style={{ width: "100%", height }} />;
 }

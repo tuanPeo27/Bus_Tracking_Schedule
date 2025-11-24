@@ -188,10 +188,27 @@ export default function ManagerDrivers() {
   };
 
   const confirmDeleteDriver = async () => {
+    if (!selectedDriver || !selectedDriver.id) {
+      showError("Lỗi", "Không có tài xế để xóa.");
+      setIsDeleteDialogOpen(false);
+      setSelectedDriver(null);
+      return;
+    }
+
     try {
+      // kiểm tra xem có lịch trình tham chiếu tới tài xế này không
+      const schedRes = await getScheduleByDriverId(selectedDriver.id);
+      const schedules = Array.isArray(schedRes?.data) ? schedRes.data : (schedRes?.data?.DT || []);
+      if (schedules && schedules.length > 0) {
+        showError("Không thể xóa", `Tài xế đang có ${schedules.length} lịch trình liên quan. Vui lòng xóa hoặc chuyển các lịch trình đó trước khi xóa tài xế.`);
+        setIsDeleteDialogOpen(false);
+        setSelectedDriver(null);
+        return;
+      }
+
       await deleteDriver(selectedDriver.id);
       console.log("Deleting driver:", selectedDriver);
-      system.dataDeleted(`Học sinh ${selectedDriver.username}`);
+      system.dataDeleted(`Tài xế ${selectedDriver.username}`);
       setIsDeleteDialogOpen(false);
       setSelectedDriver(null);
     } catch (error) {
