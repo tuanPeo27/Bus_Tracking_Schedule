@@ -25,7 +25,7 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
   const [staticRouteCoords, setStaticRouteCoords] = useState([]); // Đường nối các trạm (Cố định)
   const [driverToFirstStopCoords, setDriverToFirstStopCoords] = useState([]); // Đường từ Tài xế -> Trạm 1 (Thay đổi)
     // Radius (meters) within which a stop is considered 'reached' and should be removed
-    const STOP_REMOVE_RADIUS = 50; // meters
+    const STOP_REMOVE_RADIUS = 100; // meters
 
     // Haversine distance in meters between two lat/lng points
     const distanceMeters = (a, b) => {
@@ -160,6 +160,11 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
 
   const socket = useMemo(() => io("http://26.58.101.232:5000"), []);
   const emitIntervalRef = useRef(null);
+  const vehicleIdRef = useRef(vehicle_id);
+
+  useEffect(() => {
+    vehicleIdRef.current = vehicle_id;
+  }, [vehicle_id]);
 
   // 1. Lấy danh sách trạm
   useEffect(() => {
@@ -238,7 +243,12 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
         //TODO: Tao sua ne
         // setCurrentLocation({ lat: latitude, lng: longitude });
 
-        socket.emit("bus-location", { busId:1, latitude, longitude });
+        const bid = vehicleIdRef.current;
+        if (!bid) {
+          console.warn("vehicle_id not available yet — skipping immediate emit");
+        } else {
+          socket.emit("bus-location", { busId: bid, latitude, longitude });
+        }
       },
       (error) => {
         setLocationError(error.message);
@@ -264,11 +274,15 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
 
     // Emit immediately once
     try {
-      socket.emit("bus_location_update", {
-        bus_id: vehicle_id,
-        latitude: currentLocation.lat,
-        longitude: currentLocation.lng,
-      });
+      if (vehicleIdRef.current) {
+        socket.emit("bus_location_update", {
+          bus_id: vehicleIdRef.current,
+          latitude: currentLocation.lat,
+          longitude: currentLocation.lng,
+        });
+      } else {
+        console.warn("vehicle_id not set — skipping initial bus_location_update emit");
+      }
     } catch (e) {
       console.warn("Failed to emit initial location:", e);
     }
@@ -278,12 +292,18 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
       try {
         const loc = currentLocation; // use latest from closure
         if (loc) {
-          socket.emit("bus-location", {
-            busId: 1,
-            latitude: loc.lat,
-            longitude: loc.lng,
-            sentAt: Date.now(),
-          });
+          const bid = vehicleIdRef.current;
+          console.log("Emitting location for bus:", bid);
+          if (!bid) {
+            console.warn("vehicle_id not available yet; skipping periodic emit");
+          } else {
+            socket.emit("bus-location", {
+              busId: bid,
+              latitude: loc.lat,
+              longitude: loc.lng,
+              sentAt: Date.now(),
+            });
+          }
         }
       } catch (e) {
         console.warn("Periodic emit failed:", e);
