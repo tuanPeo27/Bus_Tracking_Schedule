@@ -50,13 +50,12 @@ const io = new Server(server, {
 
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
-  // console.log("From page:", socket.handshake.query.page);
 
   socket.on("bus-location", async (data) => {
     try {
       const { busId, latitude, longitude } = data;
 
-      // console.log(data);
+      console.log(data);
       if (!busId || !latitude || !longitude) {
         console.error("Dữ liệu vị trí xe buýt không hợp lệ:", data);
         return;

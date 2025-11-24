@@ -213,11 +213,12 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
       return;
     }
 
-    socket.on("bus_location_broadcast", (data) => {
-      if (data.bus_id !== vehicle_id) {
-        setOtherBuses((prev) => ({ ...prev, [data.bus_id]: { lat: data.latitude, lng: data.longitude } }));
-      }
-    });
+    // socket.on("bus_location_broadcast", (data) => {
+    //   console.log("Received bus location:", data.bus_id);
+    //   if (data.bus_id !== vehicle_id) {
+    //     setOtherBuses((prev) => ({ ...prev, [data.bus_id]: { lat: data.latitude, lng: data.longitude } }));
+    //   }
+    // });
     socket.on("connect", () => {
       console.log("Socket connected", socket.id);
     });
@@ -238,7 +239,7 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
         //TODO: Tao sua ne
         // setCurrentLocation({ lat: latitude, lng: longitude });
 
-        socket.emit("bus-location", { busId:1, latitude, longitude });
+        socket.emit("bus-location", { busId:4, latitude, longitude });
       },
       (error) => {
         setLocationError(error.message);
@@ -265,7 +266,7 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
     // Emit immediately once
     try {
       socket.emit("bus_location_update", {
-        bus_id: vehicle_id,
+        bus_id: 4,
         latitude: currentLocation.lat,
         longitude: currentLocation.lng,
       });
@@ -279,7 +280,7 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
         const loc = currentLocation; // use latest from closure
         if (loc) {
           socket.emit("bus-location", {
-            busId: 1,
+            busId: 4,
             latitude: loc.lat,
             longitude: loc.lng,
             sentAt: Date.now(),
