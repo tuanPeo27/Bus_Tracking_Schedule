@@ -55,7 +55,7 @@ io.on("connection", (socket) => {
     try {
       const { busId, latitude, longitude } = data;
 
-      console.log(data);
+      // console.log(data);
       if (!busId || !latitude || !longitude) {
         console.error("Dữ liệu vị trí xe buýt không hợp lệ:", data);
         return;
@@ -162,8 +162,40 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("disconnect", () => {
-    console.log("Socket disconnected:", socket.id);
+  socket.on("manager-send-notification", async (data) => {
+    if (!data || !data.message) {
+      console.error("Dữ liệu thông báo không hợp lệ:", data);
+      return;
+    }
+
+    try {
+      if (data.target === "all_drivers") {
+        const drivers = await User.findAll({ where: { role: "driver" } });
+        drivers.forEach((driver) => {
+          io.emit(`notification-${driver.id}`, {
+            message: data.message,
+          });
+        });
+      } else if (data.target === "all_parents") {
+        const parents = await User.findAll({ where: { role: "parent" } });
+        parents.forEach((parent) => {
+          io.emit(`notification-${parent.id}`, {
+            message: data.message,
+          });
+        });
+      } else {
+        const user = await User.findByPk(data.target);
+        if (user) {
+          io.emit(`notification-${user.id}`, {
+            message: data.message,
+          });
+        } else {
+          console.error("Không tìm thấy user với id:", data.target);
+        }
+      }
+    } catch (err) {
+      console.error("Lỗi khi gửi thông báo:", err);
+    }
   });
 });
 
