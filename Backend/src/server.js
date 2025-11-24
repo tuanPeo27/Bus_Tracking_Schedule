@@ -55,7 +55,7 @@ io.on("connection", (socket) => {
     try {
       const { busId, latitude, longitude } = data;
 
-      console.log(data);
+      // console.log(data);
       if (!busId || !latitude || !longitude) {
         console.error("Dữ liệu vị trí xe buýt không hợp lệ:", data);
         return;
