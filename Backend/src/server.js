@@ -3,7 +3,6 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 
-const { Op } = require("sequelize");
 const User = require("./models/user");
 const Student = require("./models/student");
 const BusLocation = require("./models/busLocation");
@@ -55,7 +54,6 @@ io.on("connection", (socket) => {
     try {
       const { busId, latitude, longitude } = data;
 
-      // console.log(data);
       if (!busId || !latitude || !longitude) {
         console.error("Dữ liệu vị trí xe buýt không hợp lệ:", data);
         return;
@@ -195,6 +193,51 @@ io.on("connection", (socket) => {
       }
     } catch (err) {
       console.error("Lỗi khi gửi thông báo:", err);
+    }
+  });
+
+  socket.on("driver-warning", async (data) => {
+    if (!data || !data.message || !data.driverId) {
+      console.error("Dữ liệu cảnh báo không hợp lệ:", data);
+      return;
+    }
+
+    console.log(`Cảnh báo gửi từ driver ${data.driverId}: ${data.message}`);
+    try {
+      const admins = await User.findAll({ where: { role: "admin" } });
+
+      admins.forEach((admin) => {
+        io.emit(`send-driver-warning-${admin.id}`, {
+          driverId: data.driverId,
+          message: data.message,
+        });
+      });
+
+      const schedules = await Schedule.findAll({
+        where: {
+          driver_id: data.driverId,
+        },
+      });
+
+      schedules.forEach(async (schedule) => {
+        const students = await Student.findAll({
+          where: {
+            route_id: schedule.route_id,
+          },
+        });
+
+        students.forEach(async (student) => {
+          const parent = await User.findByPk(student.parent_id);
+          if (parent) {
+            io.emit(`send-driver-warning-${parent.id}`, {
+              driverId: data.driverId,
+              message: data.message,
+            });
+          }
+        });
+      });
+    } catch (err) {
+      console.error("Lỗi khi gửi cảnh báo tới admin và phụ huynh:", err);
     }
   });
 });
