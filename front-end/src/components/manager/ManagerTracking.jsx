@@ -11,6 +11,7 @@ import {
 } from "../ui/select";
 import { LeafletMap } from "../map/LeafletMap";
 import { useIsMobile } from "../ui/use-mobile";
+import socket from "../../setup/socket";
 import { io } from "socket.io-client";
 import {
   MapPin,
@@ -32,7 +33,9 @@ export default function ManagerTracking() {
   const [vehicles, setVehicles] = useState([]); // mỗi phần tử: { id, license_plate, driverName, route, position:{lat,lng}, speed, status, lastUpdate, studentsOnBoard, totalCapacity }
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
   const [isTracking, setIsTracking] = useState(true);
+  const [activeBusSet, setActiveBusSet] = useState(new Set());
   const [viewMode, setViewMode] = useState("map");
+  const activeTimersRef = useRef({}); // key: busId, value: timeoutId
   const isMobile = useIsMobile();
 
   const socketRef = useRef(null);
@@ -53,23 +56,7 @@ export default function ManagerTracking() {
         }
       } catch (err) {
         console.warn("Không lấy được danh sách xe từ server:", err);
-        // fallback mẫu nếu cần
-        if (mounted && vehicles.length === 0) {
-          setVehicles([
-            {
-              id: "XE001",
-              license_plate: "59A-12345",
-              driverName: "Nguyễn Văn Minh",
-              route: "Tuyến 1",
-              position: { lat: 10.8231, lng: 106.6297 },
-              speed: 35,
-              status: "active",
-              lastUpdate: new Date().toISOString(),
-              studentsOnBoard: 10,
-              totalCapacity: 45,
-            },
-          ]);
-        }
+
       }
     };
     fetchBuses();
@@ -79,19 +66,13 @@ export default function ManagerTracking() {
   // Map helper: chuẩn hoá object bus từ API sang state vehicle
   const mapBusFromApi = (b) => {
     return {
-      id: b.id ?? b.bus_id ?? b._id ?? String(b.license_plate || b.id || Math.random()),
+      id: b.id ?? b.busId ?? b._id ?? String(b.license_plate || b.id || Math.random()),
       licensePlate: b.license_plate ?? b.licensePlate ?? b.plate ?? "",
-      driverName: b.driverName ?? b.driver_name ?? (b.driver?.name) ?? "Không rõ",
-      route: b.route_name ?? b.route ?? (b.route?.name) ?? "",
       position: {
         lat: Number(b.latitude ?? b.lat ?? 10.8231),
         lng: Number(b.longitude ?? b.lng ?? 106.6297),
       },
-      speed: Number(b.speed ?? 0),
-      status: b.status ?? "active",
       lastUpdate: b.updatedAt ?? b.lastUpdate ?? new Date().toISOString(),
-      studentsOnBoard: Number(b.studentsOnBoard ?? b.load ?? 0),
-      totalCapacity: Number(b.capacity ?? 45),
     };
   };
 
@@ -100,59 +81,56 @@ export default function ManagerTracking() {
     const socket = io(SOCKET_URL);
     socketRef.current = socket;
 
-    socket.on("connect", () => {
-      console.log("ManagerTracking socket connected", socket.id);
-    });
     socket.on("disconnect", (reason) => {
       console.log("ManagerTracking socket disconnected", reason);
     });
 
     // broadcast từ server khi 1 xe gửi vị trí
-    socket.on("bus_location_broadcast", (data) => {
-      // data expected: { bus_id, latitude, longitude, speed?, status? }
-      try {
-        setVehicles((prev) => {
-          const idx = prev.findIndex((v) => String(v.id) === String(data.bus_id));
-          const nextPos = { lat: Number(data.latitude), lng: Number(data.longitude) };
-          if (idx >= 0) {
-            const updated = [...prev];
-            updated[idx] = {
-              ...updated[idx],
-              position: nextPos,
-              speed: data.speed ?? updated[idx].speed,
-              status: data.status ?? updated[idx].status,
-              lastUpdate: new Date().toISOString(),
-            };
-            return updated;
-          } else {
-            // thêm xe mới nếu chưa có
-            return [
-              ...prev,
-              {
-                id: data.bus_id,
-                licensePlate: data.license_plate ?? `Xe ${data.bus_id}`,
-                driverName: data.driverName ?? "Không rõ",
-                route: data.route ?? "",
-                position: nextPos,
-                speed: data.speed ?? 0,
-                status: data.status ?? "active",
-                lastUpdate: new Date().toISOString(),
-                studentsOnBoard: 0,
-                totalCapacity: 45,
-              },
-            ];
-          }
-        });
-      } catch (err) {
-        console.warn("bus_location_broadcast handler error", err);
+    socket.on("bus-location-update", (data) => {
+      // data = { busId, latitude, longitude, timestamp }
+
+      console.log("Received bus-location-update", data);
+      setActiveBusSet(prev => {
+        const newSet = new Set(prev);
+        newSet.add(data.busId); // đánh dấu xe đang hoạt động
+        return newSet;
+      });
+
+      // Xóa timeout cũ nếu có
+      if (activeTimersRef.current[data.busId]) {
+        clearTimeout(activeTimersRef.current[data.busId]);
       }
+
+      // Set timeout mới 5s
+      activeTimersRef.current[data.busId] = setTimeout(() => {
+        setActiveBusSet(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(data.busId); // xe không hoạt động nữa → tắt highlight
+          return newSet;
+        });
+        delete activeTimersRef.current[data.busId];
+      }, 5000);
+      setVehicles((prev) => {
+        // tìm đúng bus đã tồn tại trong DB
+        return prev.map((v) => {
+          if (String(v.id) === String(data.busId)) {
+            return {
+              ...v,
+              position: {
+                lat: Number(data.latitude),
+                lng: Number(data.longitude),
+              },
+              lastUpdate: data.timestamp ?? new Date().toISOString(),
+            };
+          }
+
+          return v;
+        });
+      });
     });
 
     // optional: kênh cập nhật tường minh
-    socket.on("bus_location_update", (data) => {
-      // same handling
-      socket.emit && socket.emit("ack", { ok: true });
-    });
+
 
     socket.on("connect_error", (err) => {
       console.warn("Socket connect_error", err);
@@ -172,16 +150,11 @@ export default function ManagerTracking() {
     return vehicles.map((v) => ({
       id: v.id,
       position: v.position,
-      title: `${v.licensePlate} — ${v.driverName}\nTuyến: ${v.route}`,
+      title: `${v.licensePlate} `,
       type: "bus",
-      status: v.status === "active" ? "active" : "offline",
       info: `
         <div class="p-2 min-w-[200px]">
           <h4 class="font-medium text-sm">${v.licensePlate}</h4>
-          <p class="text-xs text-gray-600">Tài xế: ${v.driverName}</p>
-          <p class="text-xs text-gray-600">Tuyến: ${v.route}</p>
-          <p class="text-xs text-gray-600">Tốc độ: ${v.speed} km/h</p>
-          <p class="text-xs text-gray-600">Cập nhật: ${new Date(v.lastUpdate).toLocaleTimeString("vi-VN")}</p>
         </div>
       `,
     }));
@@ -201,21 +174,7 @@ export default function ManagerTracking() {
     return () => { mounted = false; };
   }, []);
 
-  // UI helpers
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "active":
-        return "bg-green-500";
-      case "break":
-        return "bg-yellow-500";
-      case "incident":
-        return "bg-red-500";
-      case "offline":
-        return "bg-gray-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
+
 
   return (
     <div className="space-y-6">
@@ -275,7 +234,7 @@ export default function ManagerTracking() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full ${getStatusColor(v.status)}`} />
+                        <div className={`w-3 h-3 rounded-full ${activeBusSet.has(v.id) ? "bg-green-500" : "bg-gray-500"}`} />
                         <div>
                           <p className="font-medium">{v.licensePlate}</p>
                           <p className="text-sm text-muted-foreground">{v.driverName}</p>
@@ -287,18 +246,7 @@ export default function ManagerTracking() {
                       </div>
                     </div>
 
-                    {selectedVehicleId === v.id && (
-                      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Tốc độ</p>
-                          <p className="font-medium">{v.speed ?? 0} km/h</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Học sinh</p>
-                          <p className="font-medium">{v.studentsOnBoard ?? 0}/{v.totalCapacity ?? "-"}</p>
-                        </div>
-                      </div>
-                    )}
+
                   </div>
                 ))}
               </div>
@@ -307,32 +255,6 @@ export default function ManagerTracking() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className={`grid ${isMobile ? "grid-cols-2" : "md:grid-cols-2"} gap-4`}>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg"><Bus className="w-6 h-6 text-green-600" /></div>
-              <div>
-                <p className="text-sm text-muted-foreground">Xe hoạt động</p>
-                <p className="font-semibold">{vehicles.filter((v) => v.status === "active").length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg"><Users className="w-6 h-6 text-purple-600" /></div>
-              <div>
-                <p className="text-sm text-muted-foreground">Tổng H.sinh (ước tính)</p>
-                <p className="font-semibold">{vehicles.reduce((sum, v) => sum + (v.studentsOnBoard || 0), 0)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
