@@ -25,8 +25,6 @@ const getDriverGPS = async (id) => {
     return instance.get(`busstops/route/${id}`);
 }
 
-
-
 const getBusStopsByRouteId = async (route_id) => {
   return instance.get(`/busstops/route/${route_id}`);
 };
