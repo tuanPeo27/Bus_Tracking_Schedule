@@ -20,4 +20,11 @@ router.put(
   parentController.editParentById
 );
 
+router.delete(
+  "/delete/:id",
+  verifyToken,
+  authorizeAdmin,
+  parentController.deleteParentById
+);
+
 module.exports = router;

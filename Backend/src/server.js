@@ -240,6 +240,10 @@ io.on("connection", (socket) => {
       console.error("Lỗi khi gửi cảnh báo tới admin và phụ huynh:", err);
     }
   });
+
+  server.on("disconnect", () => {
+    console.log("Socket disconnected:", socket.id);
+  });
 });
 
 app.get("/", (req, res) => res.send("SchoolBus backend is running!"));
