@@ -5,6 +5,7 @@ import { useIsMobile } from "../ui/use-mobile";
 import { LeafletMap } from "../map/LeafletMap";
 import { io } from "socket.io-client";
 import { getBusStopsByRouteId } from "../../service/driverService";
+import L from "leaflet";
 
 const GEOAPIFY_KEY = "2b833a5c3c1649d89c2e52d7976c7534";
 
@@ -238,6 +239,14 @@ export function ParentTracking({ studentInfo, routeInfo }) {
     buildDynamicRoute();
   }, [currentLocation, busStops]);
 
+  const busIcon = new L.Icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/3448/3448339.png",
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40],
+    className: "bus-marker-icon",
+  });
+
   // ---- COMBINE POLYLINES ----
   const polylines = useMemo(() => {
     const lines = [];
@@ -273,6 +282,7 @@ export function ParentTracking({ studentInfo, routeInfo }) {
         type: "bus-current",
         draggable: true,
         onDrag: (pos) => setCurrentLocation(pos),
+        icon: busIcon,
       },
       ...busStops.map((stop, idx) => ({
         id: `stop-${stop.id || idx}`,

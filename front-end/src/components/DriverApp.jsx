@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { useNotificationHelpers } from "./useNotificationHelpers";
 import { useNotifications } from "./NotificationContext";
@@ -34,18 +35,29 @@ import {
   getDriverSchedule,
 } from "../service/driverService";
 import Cookies from "js-cookie";
-
+import socket from "../setup/socket";
+//khai bao state
 export function DriverApp({ onBack }) {
+  //quan ly tab hien thi
   const [activeTab, setActiveTab] = useState("dashboard");
+  //luu lich trinh dang chon
   const [activeSchedule, setActiveSchedule] = useState(null);
+  //trang thai tai xe
   const [driverStatus, setDriverStatus] = useState("active");
+  //thong tin tai xe va xe
   const [driverInfo, setDriverInfo] = useState(null);
+  //thong tin xe
   const [currentVehicle, setVehicleInfo] = useState(null);
+  //thong bao va ui
   const { system } = useNotificationHelpers();
   const { clearAll } = useNotifications();
   const isMobile = useIsMobile();
+  //danh sach thong bao 
+  const [notificationsList, setNotificationsList] = useState([]);
+  //dem so thong bao chua doc
+  const unreadCount = notificationsList.filter((n) => !n.isRead).length;
 
-  // Lấy thông tin tài xế từ server
+  //lay thong tin tai xe tu server  
   const getDriverInfo = async () => {
     try {
       const res = await getInfoDriver(Cookies.get("user_id"));
@@ -61,7 +73,7 @@ export function DriverApp({ onBack }) {
     }
   };
 
-  // Lấy thông tin xe từ server
+  //lay thong tin xe tu server
   const getVehicleInfo = async () => {
     try {
       const res = await getInfoVehicle(Cookies.get("user_id"));
@@ -75,38 +87,75 @@ export function DriverApp({ onBack }) {
       console.error("Lỗi kết nối khi lấy thông tin xe:", err);
     }
   };
-
+  //load thong tin khi component duoc mount lan dau
   useEffect(() => {
     getDriverInfo();
     getVehicleInfo();
   }, []);
 
-  // Đăng xuất
+  //load thong bao tu localstorage khi thong tin tai xe thay doi
+  useEffect(() => {
+    console.log("driverInfo changed:", driverInfo);
+    if (!driverInfo?.driver.id) return;
+
+    const saved = localStorage.getItem(`notifications_${driverInfo.driver.id}`);
+    setNotificationsList(saved ? JSON.parse(saved) : []);
+  }, [driverInfo?.driver.id]);
+
+  //lang nghe thong bao qua socket khi thong tin tai xe thay doi
+  useEffect(() => {
+    if (!driverInfo?.driver.id) return;
+
+    const handleNotification = (notification) => {
+      const newNotification = {
+        id: Date.now(),
+        title: notification?.title || "Thông báo mới",
+        content:
+          typeof notification === "string"
+            ? notification
+            : notification?.message || String(notification),
+        timestamp: new Date(),
+        isRead: false,
+        type: notification?.type || "info",
+      };
+
+      //cap nhat state va luu vao localstorage
+      setNotificationsList((prev) => {
+        const updated = [newNotification, ...prev];
+        localStorage.setItem(
+          `notifications_${driverInfo.driver.id}`,
+          JSON.stringify(updated)
+        );
+        return updated;
+      });
+
+      showSuccess(newNotification.title, newNotification.content);
+    };
+
+    //lang nghe su kien thong bao cho tung tai xe
+    socket.on(`notification-${driverInfo.driver.id}`, handleNotification);
+    //don dep su kien khi component unmount hoac driverId thay doi
+    return () => {
+      socket.off(`notification-${driverInfo.driver.id}`, handleNotification);
+    };
+  }, [driverInfo?.driver.id]);
+
+
+  //xy ly dang xuat
   const handleLogout = () => {
     clearAll();
     system.logout();
     if (typeof onBack === "function") onBack();
   };
 
+  //xy ly chon lich trinh chuyen sang tab hoc sinh
   const handleAcceptSchedule = (schedule) => {
     console.log("Đã chọn lịch trình:", schedule);
     setActiveSchedule(schedule);
     setActiveTab("students");
   };
 
-  // Khi tài xế hoàn thành chuyến đi
-  // const handleCompleteSchedule = () => {
-  //   if (activeSchedule) {
-  //     system.success(
-  //       "Hoàn thành chuyến đi",
-  //       `Đã kết thúc lịch trình ${activeSchedule.id}.`
-  //     );
-  //   }
-  //   setActiveSchedule(null);
-  //   setActiveTab("schedule");
-  // };
-
-  // Hàm hiển thị màu trạng thái
+  //ham hien thi mau trang thai
   const getStatusColor = (status) => {
     switch (status) {
       case "active":
@@ -122,7 +171,7 @@ export function DriverApp({ onBack }) {
     }
   };
 
-  //  Hàm hiển thị nội dung trạng thái
+  //ham noi dung trang thai
   const getStatusText = (status) => {
     switch (status) {
       case "active":
@@ -137,7 +186,7 @@ export function DriverApp({ onBack }) {
         return "";
     }
   };
-
+  //render giao dien
   return (
     <div className="min-h-screen bg-gray-50">
       {/* HEADER */}
@@ -185,7 +234,7 @@ export function DriverApp({ onBack }) {
         </div>
       </header>
 
-      {/* NAVIGATION */}
+      {/* tab chuyen doi */}
       <div className="border-b border-gray-200 bg-white">
         <div className={isMobile ? "px-2" : "px-4"}>
           <AnimatedTabs value={activeTab} onValueChange={setActiveTab}>
@@ -194,7 +243,7 @@ export function DriverApp({ onBack }) {
                 isMobile ? "h-16 w-full justify-start overflow-x-auto" : "h-12"
               } bg-transparent border-0`}
             >
-              {/* Các Tab chính */}
+              {/* cac tab chinh */}
               <AnimatedTabsTrigger value="dashboard">
                 <User className="w-4 h-4" />
                 {isMobile ? "Tổng quan" : "Tổng quan"}
@@ -204,6 +253,7 @@ export function DriverApp({ onBack }) {
                 {isMobile ? "Lịch" : "Lịch trình"}
               </AnimatedTabsTrigger>
 
+              {/* khi chon lich trinh moi hien thi tab hoc sinh va gps */}
               {activeSchedule && (
                 <>
                   <AnimatedTabsTrigger value="students">
@@ -220,11 +270,19 @@ export function DriverApp({ onBack }) {
 
               <AnimatedTabsTrigger value="notifications">
                 <Bell className="w-4 h-4" />
-                {isMobile ? "T.báo" : "Thông báo"}
-              </AnimatedTabsTrigger>
-              <AnimatedTabsTrigger value="status">
-                <AlertCircle className="w-4 h-4" />
-                {isMobile ? "T.thái" : "Trạng thái"}
+                  {isMobile ? "T.báo" : "Thông báo"}
+                
+                  {unreadCount > 0 && (
+                  <Badge
+                    className={`bg-red-500 text-white text-xs px-1.5 py-0.5 ${
+                    isMobile
+                    ? "absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center p-0"
+                    : "ml-1"
+                    }`}
+                  >
+                  {unreadCount}
+                  </Badge>
+                )}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger value="password">
                 <KeyRound className="w-4 h-4" />
@@ -238,6 +296,7 @@ export function DriverApp({ onBack }) {
       {/* MAIN CONTENT */}
       <main className={isMobile ? "p-2" : "p-4"}>
         <AnimatedTabs value={activeTab} onValueChange={setActiveTab}>
+          {/* tong quan */}
           <AnimatedTabsContent value="dashboard">
             <DriverDashboard
               driverInfo={driverInfo}
@@ -245,14 +304,15 @@ export function DriverApp({ onBack }) {
 
             />
           </AnimatedTabsContent>
-
+          {/* lich trinh */}
           <AnimatedTabsContent value="schedule">
             <DriverSchedule
               onAcceptSchedule={handleAcceptSchedule}
               activeScheduleId={activeSchedule?.id}
             />
           </AnimatedTabsContent>
-
+          
+          {/* render chi tiet hoc sinh va gps neu da chon lich trinh */}
           {activeSchedule ? (
             <>
               <AnimatedTabsContent value="students">
@@ -263,13 +323,13 @@ export function DriverApp({ onBack }) {
                 <DriverGPS
                   schedule_id={activeSchedule?.id}
                   route_id={activeSchedule?.route?.id || activeSchedule?.route_id}
-                  // some API return vehicle nested under `bus`, so prefer that if present
                   vehicle_id={activeSchedule?.bus?.id || currentVehicle?.id}
                   vehicle={activeSchedule?.bus || currentVehicle}
                 />
               </AnimatedTabsContent>
             </>
           ) : (
+            // neu chua chon lich trinh hien thi thong bao
             <>
               <AnimatedTabsContent value="students">
                 <p className="p-4 text-center text-gray-500">
@@ -283,18 +343,14 @@ export function DriverApp({ onBack }) {
               </AnimatedTabsContent>
             </>
           )}
-
+          {/* thong bao */}
           <AnimatedTabsContent value="notifications">
-            <DriverNotifications driverId={driverInfo?.id} />
+            <DriverNotifications driverId={driverInfo?.driver.id}
+              notificationsList={notificationsList}
+              setNotificationsList={setNotificationsList}
+           />
           </AnimatedTabsContent>
-
-          <AnimatedTabsContent value="status">
-            <DriverStatus
-              currentStatus={driverStatus}
-              onStatusChange={setDriverStatus}
-            />
-          </AnimatedTabsContent>
-
+          {/* doi mat khau */}
           <AnimatedTabsContent value="password">
             <ChangePassword userRole={Cookies.get("user_role")} />
           </AnimatedTabsContent>
