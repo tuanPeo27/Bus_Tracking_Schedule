@@ -141,8 +141,11 @@ export function ParentApp({ onBack }) {
 
     socket.on(`parent-notify-${parentInfo.id}`, handleNotification);
 
+    socket.on(`notification-${parentInfo.id}`, handleNotification);
+
     return () => {
       socket.off(`parent-notify-${parentInfo.id}`, handleNotification);
+      socket.off(`notification-${parentInfo.id}`, handleNotification);
     };
   }, [parentInfo?.id]);
 

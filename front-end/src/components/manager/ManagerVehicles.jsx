@@ -72,7 +72,6 @@ export default function ManagerVehicles() {
     brand: "",
     model: "",
     seats: "",
-    status: "available",
   });
 
   const [editBus, setEditBus] = useState({
@@ -80,7 +79,6 @@ export default function ManagerVehicles() {
     brand: "",
     model: "",
     seats: "",
-    status: "available",
   });
 
 
@@ -111,126 +109,7 @@ export default function ManagerVehicles() {
     setCurrentPage(1);
   }, [searchTerm, filterStatus])
 
-  const [vehicles, setVehicles] = useState([
-    {
-      id: "XE001",
-      licensePlate: "29A-12345",
-      brand: "Hyundai Universe",
-      model: "2020",
-      seats: 45,
-      avgSpeed: 35,
-      status: "active",
-      assignedDriver: "Nguyễn Văn Minh",
-      currentRoute: "Tuyến 1",
-      fuelLevel: 85,
-      mileage: 125000,
-      lastMaintenance: "2024-11-15",
-      nextMaintenance: "2024-12-30",
-      totalTrips: 1250,
-      condition: "good",
-    },
-    {
-      id: "XE002",
-      licensePlate: "29A-67890",
-      brand: "Thaco Universe",
-      model: "2021",
-      seats: 42,
-      avgSpeed: 32,
-      status: "active",
-      assignedDriver: "Trần Văn Hùng",
-      currentRoute: "Tuyến 2",
-      fuelLevel: 92,
-      mileage: 98000,
-      lastMaintenance: "2024-12-01",
-      nextMaintenance: "2025-01-15",
-      totalTrips: 980,
-      condition: "excellent",
-    },
-    {
-      id: "XE003",
-      licensePlate: "29A-11111",
-      brand: "Hyundai County",
-      model: "2019",
-      seats: 35,
-      avgSpeed: 30,
-      status: "break",
-      assignedDriver: "Lê Thị Lan",
-      currentRoute: "Tuyến 3",
-      fuelLevel: 45,
-      mileage: 145000,
-      lastMaintenance: "2024-10-20",
-      nextMaintenance: "2024-12-20",
-      totalTrips: 1580,
-      condition: "fair",
-    },
-    {
-      id: "XE004",
-      licensePlate: "29A-22222",
-      brand: "Isuzu NQR",
-      model: "2022",
-      seats: 38,
-      avgSpeed: 28,
-      status: "maintenance",
-      assignedDriver: null,
-      currentRoute: null,
-      fuelLevel: 0,
-      mileage: 65000,
-      lastMaintenance: "2024-12-18",
-      nextMaintenance: "2025-02-01",
-      totalTrips: 720,
-      condition: "maintenance",
-    },
-  ]);
-  // DÒNG NÀY ĐÃ ĐƯỢC SỬA: Loại bỏ cú pháp TypeScript gây lỗi "any is not defined"
 
-
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case "in_use":
-        return (
-          <Badge className="bg-green-100 text-green-800">Đang hoạt động</Badge>
-        );
-      case "maintenance":
-        return <Badge className="bg-yellow-100 text-yellow-800">Bảo trì</Badge>;
-      case "inactive":
-        return <Badge className="bg-red-100 text-red-800">Không hoạt động</Badge>;
-      default:
-        return <Badge className="bg-blue-100 text-blue-800">Có thể sử dụng</Badge>;
-    }
-  };
-
-  const getConditionBadge = (condition) => {
-    switch (condition) {
-      case "excellent":
-        return <Badge className="bg-green-100 text-green-800">Tuyệt vời</Badge>;
-      case "good":
-        return <Badge className="bg-blue-100 text-blue-800">Tốt</Badge>;
-      case "fair":
-        return <Badge className="bg-yellow-100 text-yellow-800">Khá</Badge>;
-      case "poor":
-        return <Badge className="bg-orange-100 text-orange-800">Kém</Badge>;
-      case "maintenance":
-        return <Badge className="bg-red-100 text-red-800">Bảo trì</Badge>;
-      default:
-        return <Badge variant="outline">{condition}</Badge>;
-    }
-  };
-
-  const getFuelLevelColor = (level) => {
-    if (level > 70) return "bg-green-500";
-    if (level > 30) return "bg-yellow-500";
-    return "bg-red-500";
-  };
-
-  const isMaintenanceDue = (nextMaintenance) => {
-    const nextDate = new Date(nextMaintenance);
-    const now = new Date();
-    const daysUntil = Math.ceil(
-      (nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return daysUntil <= 7;
-  };
 
   const filteredBuses = allBus.filter(
     (bus) => {
@@ -238,9 +117,8 @@ export default function ManagerVehicles() {
         (bus.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (bus.model.toLowerCase().includes(searchTerm.toLowerCase()))
 
-      const matchesStatus =
-        filterStatus === "all" || bus.status === filterStatus;
-      return matchesSearch && matchesStatus
+
+      return matchesSearch
     });
 
   const indexOfLastBus = currentPage * busesPerPage;
@@ -272,12 +150,17 @@ export default function ManagerVehicles() {
       !newBus.brand ||
       !newBus.license_plate ||
       !newBus.model ||
-      !newBus.seats ||
-      !newBus.status
+      !newBus.seats
     ) {
       showError("Vui lòng nhập đầy đủ thông tin");
       return;
     }
+
+    if (newBus.seats <= 0 || newBus.seats > 100) {
+      showError("Số chỗ ngồi không hợp lệ. Vui lòng nhập số từ 1 đến 100.");
+      return;
+    }
+
     try {
       console.log("Creating bus:", newBus);
       await createBus(newBus);
@@ -301,6 +184,20 @@ export default function ManagerVehicles() {
 
   };
   const handleUpdateBus = async () => {
+    if (
+      !selectedBus.brand ||
+      !selectedBus.license_plate ||
+      !selectedBus.model ||
+      !selectedBus.seats
+    ) {
+      showError("Vui lòng nhập đầy đủ thông tin");
+      return;
+    }
+
+    if (selectedBus.seats <= 0 || selectedBus.seats > 100) {
+      showError("Số chỗ ngồi không hợp lệ. Vui lòng nhập số từ 1 đến 100.");
+      return;
+    }
     try {
       console.log("editbus", selectedBus)
       await updateBus(selectedBus, selectedBus.id);
@@ -393,30 +290,17 @@ export default function ManagerVehicles() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Tìm kiếm theo biển số, hãng xe, tài xế..."
+                placeholder="Tìm kiếm theo biển số, hãng xe..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger>
-                <SelectValue placeholder="Lọc theo trạng thái" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                  <SelectItem value="available">Có thể sử dụng</SelectItem>
-                  <SelectItem value="in_use">Đang hoạt động</SelectItem>
-                  <SelectItem value="maintenance">Bảo trì</SelectItem>
-                  <SelectItem value="inactive">Không hoạt động</SelectItem>
-                </SelectContent>
-              </SelectContent>
-            </Select>
+
           </div>
 
         </CardContent>
@@ -432,7 +316,6 @@ export default function ManagerVehicles() {
                 <TableHead>Tên xe</TableHead>
                 <TableHead>Biển số xe</TableHead>
                 <TableHead>Số chỗ</TableHead>
-                <TableHead>Trạng thái</TableHead>
                 <TableHead>Thao tác</TableHead>
               </TableRow>
             </TableHeader>
@@ -483,7 +366,6 @@ export default function ManagerVehicles() {
                         </p>
                       </TableCell>
 
-                      <TableCell>{getStatusBadge(bus?.status)}</TableCell>
 
                       <TableCell>
                         <div className="flex gap-2">
@@ -617,25 +499,7 @@ export default function ManagerVehicles() {
               />
             </div>
 
-            <div>
-              <Label htmlFor="status">Trạng thái</Label>
-              <Select
-                value={newBus.status}
-                onValueChange={(value) =>
-                  setNewBus((newBus) => ({ ...newBus, status: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="available">Có thể sử dụng</SelectItem>
-                  <SelectItem value="in_use">Đang hoạt động</SelectItem>
-                  <SelectItem value="maintenance">Bảo trì</SelectItem>
-                  <SelectItem value="inactive">Không hoạt động</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
 
           </div>
 
@@ -720,25 +584,6 @@ export default function ManagerVehicles() {
                 />
               </div>
 
-              <div>
-                <Label htmlFor="editStatus">Trạng thái</Label>
-                <Select
-                  value={selectedBus.status}
-                  onValueChange={(value) =>
-                    setSelectedBus((editBus) => ({ ...editBus, status: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="available">Có thể sử dụng</SelectItem>
-                    <SelectItem value="in_use">Đang hoạt động</SelectItem>
-                    <SelectItem value="maintenance">Bảo trì</SelectItem>
-                    <SelectItem value="inactive">Không hoạt động</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
 
             </div>
@@ -759,168 +604,6 @@ export default function ManagerVehicles() {
         </DialogContent>
       </Dialog>
 
-      {/* Vehicle Details Dialog */}
-      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Chi tiết xe buýt</DialogTitle>
-            <DialogDescription>
-              Xem thông tin chi tiết và trạng thái của xe buýt
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedBus && (
-            <div className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="font-medium">Thông tin cơ bản</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Biển số:</span>
-                      <span className="font-medium">
-                        {selectedBus.licensePlate}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Hãng xe:</span>
-                      <span>{selectedBus.brand}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Dòng xe:</span>
-                      <span>{selectedBus.model}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Số ghế:</span>
-                      <span>{selectedBus.seats}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tốc độ TB:</span>
-                      <span>{selectedBus.avgSpeed} km/h</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="font-medium">Thông tin vận hành</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tài xế:</span>
-                      <span>
-                        {selectedBus.assignedDriver || "Chưa phân công"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Tuyến đường:
-                      </span>
-                      <span>
-                        {selectedBus.currentRoute || "Chưa phân công"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Tổng chuyến:
-                      </span>
-                      <span>
-                        {selectedBus.totalTrips?.toLocaleString()} chuyến
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tổng km:</span>
-                      <span>
-                        {selectedBus.mileage?.toLocaleString()} km
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tình trạng:</span>
-                      {getConditionBadge(selectedBus.condition)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Maintenance & Fuel Status */}
-              <div className="space-y-4 pt-4 border-t">
-                <h3 className="font-medium">Trạng thái Kỹ thuật</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Fuel Status */}
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="font-medium flex items-center gap-1">
-                        <Gauge className="w-4 h-4" /> Mức nhiên liệu
-                      </span>
-                      <span className="font-semibold">
-                        {selectedBus.fuelLevel}%
-                      </span>
-                    </div>
-                    <Progress
-                      value={selectedBus.fuelLevel}
-                      className="h-2"
-                      indicatorClassName={getFuelLevelColor(
-                        selectedBus.fuelLevel
-                      )}
-                    />
-                  </div>
-
-                  {/* Maintenance Status */}
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        <Wrench className="w-4 h-4" /> Bảo trì tiếp theo
-                      </span>
-                      {isMaintenanceDue(selectedBus.nextMaintenance) ? (
-                        <Badge variant="destructive">Sắp đến hạn</Badge>
-                      ) : (
-                        <Badge variant="secondary">Ổn định</Badge>
-                      )}
-                    </div>
-                    <div className="text-sm mt-1">
-                      <p>
-                        <span className="text-muted-foreground">Cuối:</span>{" "}
-                        {new Date(
-                          selectedBus.lastMaintenance
-                        ).toLocaleDateString("vi-VN")}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Tiếp:</span>{" "}
-                        <span
-                          className={
-                            isMaintenanceDue(selectedBus.nextMaintenance)
-                              ? "text-red-600 font-medium"
-                              : ""
-                          }
-                        >
-                          {new Date(
-                            selectedBus.nextMaintenance
-                          ).toLocaleDateString("vi-VN")}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDetailDialogOpen(false)}
-            >
-              Đóng
-            </Button>
-            <Button
-              onClick={() => {
-                setIsDetailDialogOpen(false);
-                handleEditVehicle(selectedBus);
-              }}
-            >
-              <Edit className="w-4 h-4 mr-2" />
-              Chỉnh sửa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>

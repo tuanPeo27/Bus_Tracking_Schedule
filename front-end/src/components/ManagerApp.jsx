@@ -35,6 +35,7 @@ import ManagerSchedules from "./manager/ManagerSchedules";
 import ManagerDrivers from "./manager/ManagerDrivers";
 import ManagerParents from "./manager/ManagerParent";
 import ManagerVehicles from "./manager/ManagerVehicles";
+import socket from "../setup/socket";
 import ManagerRoutes from "./manager/ManagerRoutes";
 import ManagerTracking from "./manager/ManagerTracking";
 import ManagerMessages from "./manager/ManagerMessages";
@@ -48,6 +49,7 @@ export function ManagerApp({ onBack }) {
   const { clearAll } = useNotifications();
   const isMobile = useIsMobile();
   const [adminInfo, setAdminInfo] = useState("");
+  const [notificationsList, setNotificationsList] = useState([]);
 
   const handleLogout = () => {
     clearAll(); // Clear tất cả notifications trước khi logout
@@ -71,12 +73,55 @@ export function ManagerApp({ onBack }) {
     getAdmin();
   }, []);
 
-  // const adminInfo = {
-  //   id: "QL001",
-  //   name: "Nguyễn Văn Quản",
-  //   role: "Quản lý Điều hành",
-  //   avatar: "NVQ",
-  // };
+  // --- LOAD NOTIFICATIONS LOCALSTORAGE KHI adminInfo.id CÓ GIÁ TRỊ ---
+  useEffect(() => {
+    if (!adminInfo?.id) return;
+
+    const saved = localStorage.getItem(`notifications_${adminInfo.id}`);
+    setNotificationsList(saved ? JSON.parse(saved) : []);
+  }, [adminInfo?.id]);
+
+  // --- SOCKET LISTENER ---
+  useEffect(() => {
+    if (!adminInfo?.id) return;
+
+    const handleNotification = (notification) => {
+      console.log("Received notification for admin:", notification);
+      const newNotification = {
+        id: Date.now(),
+        title: notification?.title || "Thông báo mới",
+        content:
+          typeof notification === "string"
+            ? notification
+            : notification?.message || String(notification),
+        timestamp: new Date(),
+        isRead: false,
+        type: notification?.type || "info",
+      };
+
+      // Lưu vào state + localStorage
+      setNotificationsList((prev) => {
+        const updated = [newNotification, ...prev];
+        localStorage.setItem(
+          `notifications_${adminInfo.id}`,
+          JSON.stringify(updated)
+        );
+        return updated;
+      });
+
+      // TOAST
+      showSuccess(newNotification.title, newNotification.content);
+    };
+
+    socket.on(`send-driver-warning-${adminInfo.id}`, handleNotification);
+
+    return () => {
+      socket.off(`send-driver-warning-${adminInfo.id}`, handleNotification);
+    };
+  }, [adminInfo?.id]);
+
+
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -137,37 +182,32 @@ export function ManagerApp({ onBack }) {
         <div className={isMobile ? "px-2" : "px-4"}>
           <AnimatedTabs value={activeTab} onValueChange={setActiveTab}>
             <AnimatedTabsList
-              className={`${
-                isMobile ? "h-16 w-full justify-start" : "h-12"
-              } bg-transparent border-0 ${
-                isMobile
+              className={`${isMobile ? "h-16 w-full justify-start" : "h-12"
+                } bg-transparent border-0 ${isMobile
                   ? "overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
                   : ""
-              }`}
+                }`}
             >
               <AnimatedTabsTrigger
                 value="dashboard"
-                className={`${
-                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                }`}
+                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                  }`}
               >
                 <LayoutDashboard className="w-4 h-4" />
                 {isMobile ? "Tổng" : "Tổng quan"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="schedules"
-                className={`${
-                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                }`}
+                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                  }`}
               >
                 <Calendar className="w-4 h-4" />
                 {isMobile ? "Lịch" : "Lịch trình"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="students"
-                className={`${
-                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                }`}
+                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                  }`}
               >
                 <GraduationCap className="w-4 h-4" />
                 {isMobile ? "H.sinh" : "Học sinh"}
@@ -184,54 +224,48 @@ export function ManagerApp({ onBack }) {
 
               <AnimatedTabsTrigger
                 value="drivers"
-                className={`${
-                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                }`}
+                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                  }`}
               >
                 <UserCheck className="w-4 h-4" />
                 {isMobile ? "T.xế" : "Tài xế"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="vehicles"
-                className={`${
-                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                }`}
+                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                  }`}
               >
                 <Bus className="w-4 h-4" />
                 {isMobile ? "Xe" : "Xe buýt"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="routes"
-                className={`${
-                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                }`}
+                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                  }`}
               >
                 <Route className="w-4 h-4" />
                 {isMobile ? "Tuyến" : "Tuyến đường"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="tracking"
-                className={`${
-                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                }`}
+                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                  }`}
               >
                 <MapPin className="w-4 h-4" />
                 {isMobile ? "GPS" : "Theo dõi GPS"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="messages"
-                className={`${
-                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                }`}
+                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                  }`}
               >
                 <MessageSquare className="w-4 h-4" />
                 {isMobile ? "T.nhắn" : "Tin nhắn"}
               </AnimatedTabsTrigger>
               <AnimatedTabsTrigger
                 value="password"
-                className={`${
-                  isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
-                }`}
+                className={`${isMobile ? "flex-col gap-1 min-w-[50px] text-xs" : "gap-2"
+                  }`}
               >
                 <KeyRound className="w-4 h-4" />
                 {isMobile ? "Đổi MK" : "Đổi mật khẩu"}
@@ -246,7 +280,11 @@ export function ManagerApp({ onBack }) {
         <div className="h-[calc(100vh-140px)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
           <AnimatedTabs value={activeTab} onValueChange={setActiveTab}>
             <AnimatedTabsContent value="dashboard" className="mt-0">
-              <ManagerDashboard />
+              <ManagerDashboard
+                adminId={adminInfo.id}
+                notificationsList={notificationsList}
+                setNotificationsList={setNotificationsList} />
+
             </AnimatedTabsContent>
 
             <AnimatedTabsContent value="schedules" className="mt-0">
@@ -278,7 +316,10 @@ export function ManagerApp({ onBack }) {
             </AnimatedTabsContent>
 
             <AnimatedTabsContent value="messages" className="mt-0">
-              <ManagerMessages />
+              <ManagerMessages
+                adminId={adminInfo.id}
+                notificationsList={notificationsList}
+                setNotificationsList={setNotificationsList} />
             </AnimatedTabsContent>
 
             <AnimatedTabsContent value="password" className="mt-0">

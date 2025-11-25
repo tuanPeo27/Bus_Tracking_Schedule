@@ -69,7 +69,6 @@ export default function ManagerRoutes() {
     start_point: "",
     end_point: "",
   });
-  const [allBusStop, setAllBusStop] = useState([]);
   const getAllRoutes = async () => {
     try {
       const res = await getAllRoute();
@@ -168,139 +167,8 @@ export default function ManagerRoutes() {
 
   }, [])
 
-  const [vehicles, setVehicles] = useState([
-    {
-      id: "XE001",
-      licensePlate: "29A-12345",
-      brand: "Hyundai Universe",
-      model: "2020",
-      seats: 45,
-      avgSpeed: 35,
-      status: "active",
-      assignedDriver: "Nguyễn Văn Minh",
-      currentRoute: "Tuyến 1",
-      fuelLevel: 85,
-      mileage: 125000,
-      lastMaintenance: "2024-11-15",
-      nextMaintenance: "2024-12-30",
-      totalTrips: 1250,
-      condition: "good",
-    },
-    {
-      id: "XE002",
-      licensePlate: "29A-67890",
-      brand: "Thaco Universe",
-      model: "2021",
-      seats: 42,
-      avgSpeed: 32,
-      status: "active",
-      assignedDriver: "Trần Văn Hùng",
-      currentRoute: "Tuyến 2",
-      fuelLevel: 92,
-      mileage: 98000,
-      lastMaintenance: "2024-12-01",
-      nextMaintenance: "2025-01-15",
-      totalTrips: 980,
-      condition: "excellent",
-    },
-    {
-      id: "XE003",
-      licensePlate: "29A-11111",
-      brand: "Hyundai County",
-      model: "2019",
-      seats: 35,
-      avgSpeed: 30,
-      status: "break",
-      assignedDriver: "Lê Thị Lan",
-      currentRoute: "Tuyến 3",
-      fuelLevel: 45,
-      mileage: 145000,
-      lastMaintenance: "2024-10-20",
-      nextMaintenance: "2024-12-20",
-      totalTrips: 1580,
-      condition: "fair",
-    },
-    {
-      id: "XE004",
-      licensePlate: "29A-22222",
-      brand: "Isuzu NQR",
-      model: "2022",
-      seats: 38,
-      avgSpeed: 28,
-      status: "maintenance",
-      assignedDriver: null,
-      currentRoute: null,
-      fuelLevel: 0,
-      mileage: 65000,
-      lastMaintenance: "2024-12-18",
-      nextMaintenance: "2025-02-01",
-      totalTrips: 720,
-      condition: "maintenance",
-    },
-  ]);
-  // DÒNG NÀY ĐÃ ĐƯỢC SỬA: Loại bỏ cú pháp TypeScript gây lỗi "any is not defined"
-  const [selectedVehicleId, setSelectedVehicleId] = useState(null);
 
-  const [newVehicle, setNewVehicle] = useState({
-    licensePlate: "",
-    brand: "",
-    model: "",
-    seats: "",
-    status: "active",
-    condition: "good",
-  });
   const { showSuccess, showInfo, showError } = useNotificationHelpers();
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case "active":
-        return (
-          <Badge className="bg-green-100 text-green-800">Đang hoạt động</Badge>
-        );
-      case "break":
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800">Tạm dừng</Badge>
-        );
-      case "maintenance":
-        return <Badge className="bg-blue-100 text-blue-800">Bảo trì</Badge>;
-      case "breakdown":
-        return <Badge className="bg-red-100 text-red-800">Hỏng hóc</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
-  const getConditionBadge = (condition) => {
-    switch (condition) {
-      case "excellent":
-        return <Badge className="bg-green-100 text-green-800">Tuyệt vời</Badge>;
-      case "good":
-        return <Badge className="bg-blue-100 text-blue-800">Tốt</Badge>;
-      case "fair":
-        return <Badge className="bg-yellow-100 text-yellow-800">Khá</Badge>;
-      case "poor":
-        return <Badge className="bg-orange-100 text-orange-800">Kém</Badge>;
-      case "maintenance":
-        return <Badge className="bg-red-100 text-red-800">Bảo trì</Badge>;
-      default:
-        return <Badge variant="outline">{condition}</Badge>;
-    }
-  };
-
-  const getFuelLevelColor = (level) => {
-    if (level > 70) return "bg-green-500";
-    if (level > 30) return "bg-yellow-500";
-    return "bg-red-500";
-  };
-
-  const isMaintenanceDue = (nextMaintenance) => {
-    const nextDate = new Date(nextMaintenance);
-    const now = new Date();
-    const daysUntil = Math.ceil(
-      (nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return daysUntil <= 7;
-  };
 
   const filteredRoutes = allRoute.filter((route) => {
     const matchesSearch =
@@ -311,48 +179,10 @@ export default function ManagerRoutes() {
     return matchesSearch;
   });
 
-  const stats = {
-    total: vehicles.length,
-    active: vehicles.filter((v) => v.status === "active").length,
-    maintenance: vehicles.filter((v) => v.status === "maintenance").length,
-    breakdown: vehicles.filter((v) => v.status === "breakdown").length,
-  };
 
 
 
 
-
-  const handleUpdateVehicle = () => {
-    if (!selectedVehicle) return;
-
-    setVehicles((prev) =>
-      prev.map((vehicle) =>
-        vehicle.id === selectedVehicle.id ? selectedVehicle : vehicle
-      )
-    );
-
-    showSuccess(
-      "Cập nhật thành công",
-      `Thông tin xe ${selectedVehicle?.licensePlate} đã được cập nhật!`
-    );
-    setIsEditDialogOpen(false);
-    setSelectedVehicle(null);
-  };
-
-  const handleDeleteVehicle = (vehicleId) => {
-    const vehicle = vehicles.find((v) => v.id === vehicleId);
-    if (!vehicle) return;
-
-    if (confirm(`Bạn có chắc chắn muốn xóa xe ${vehicle.licensePlate}?`)) {
-      setVehicles((prev) => prev.filter((v) => v.id !== vehicleId));
-      showSuccess("Đã xóa", `Xe ${vehicle.licensePlate} đã được xóa!`);
-    }
-  };
-
-  const handleRowClick = (vehicleId) => {
-    setSelectedVehicleId(vehicleId);
-    setTimeout(() => setSelectedVehicleId(null), 2000); // Remove highlight after 2 seconds
-  };
 
   // STATE và hàm cho Edit Route
   const [isRouteEditOpen, setIsRouteEditOpen] = useState(false);
@@ -420,6 +250,10 @@ export default function ManagerRoutes() {
     }
     if (!routeEdit.name || !routeEdit.start_point || !routeEdit.end_point) {
       showError("Lỗi", "Vui lòng điền đầy đủ thông tin tuyến.");
+      return;
+    }
+    if (!editStopPoints || editStopPoints.length === 0) {
+      showError("Lỗi", "Vui lòng thêm ít nhất 1 điểm dừng cho tuyến.");
       return;
     }
 
@@ -618,14 +452,7 @@ export default function ManagerRoutes() {
             </TableHeader>
             <TableBody>
               {filteredRoutes.map((route) => (
-                <TableRow
-                  key={route.id}
-                  className={`cursor-pointer transition-colors ${selectedVehicleId === route.id
-                    ? "bg-blue-50 border-l-4 border-blue-500"
-                    : ""
-                    }`}
-                  onClick={() => handleRowClick(route.id)}
-                >
+                <TableRow key={route.id} className="transition-colors">
                   <TableCell>
                     <div>
                       <p className="font-medium">{route?.id}</p>
@@ -816,135 +643,7 @@ export default function ManagerRoutes() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Vehicle Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Chỉnh sửa thông tin xe</DialogTitle>
-            <DialogDescription>
-              Cập nhật thông tin tuyến đường trong hệ thống
-            </DialogDescription>
-          </DialogHeader>
 
-          {selectedVehicle && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="editLicensePlate">Biển số xe</Label>
-                <Input
-                  id="editLicensePlate"
-                  value={selectedVehicle.licensePlate}
-                  onChange={(e) =>
-                    setSelectedVehicle((prev) => ({
-                      ...prev,
-                      licensePlate: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="editBrand">Hãng xe</Label>
-                <Input
-                  id="editBrand"
-                  value={selectedVehicle.brand}
-                  onChange={(e) =>
-                    setSelectedVehicle((prev) => ({
-                      ...prev,
-                      brand: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="editModel">Dòng xe</Label>
-                <Input
-                  id="editModel"
-                  value={selectedVehicle.model}
-                  onChange={(e) =>
-                    setSelectedVehicle((prev) => ({
-                      ...prev,
-                      model: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="editSeats">Số ghế</Label>
-                <Input
-                  id="editSeats"
-                  type="number"
-                  value={selectedVehicle.seats}
-                  onChange={(e) =>
-                    setSelectedVehicle((prev) => ({
-                      ...prev,
-                      seats: parseInt(e.target.value),
-                    }))
-                  }
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="editStatus">Trạng thái</Label>
-                <Select
-                  value={selectedVehicle.status}
-                  onValueChange={(value) =>
-                    setSelectedVehicle((prev) => ({ ...prev, status: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Đang hoạt động</SelectItem>
-                    <SelectItem value="break">Tạm dừng</SelectItem>
-                    <SelectItem value="maintenance">Bảo trì</SelectItem>
-                    <SelectItem value="breakdown">Hỏng hóc</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="editCondition">Tình trạng</Label>
-                <Select
-                  value={selectedVehicle.condition}
-                  onValueChange={(value) =>
-                    setSelectedVehicle((prev) => ({
-                      ...prev,
-                      condition: value,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="excellent">Tuyệt vời</SelectItem>
-                    <SelectItem value="good">Tốt</SelectItem>
-                    <SelectItem value="fair">Khá</SelectItem>
-                    <SelectItem value="poor">Kém</SelectItem>
-                    <SelectItem value="maintenance">Bảo trì</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsEditDialogOpen(false)}
-            >
-              Hủy
-            </Button>
-            <Button onClick={handleUpdateVehicle}>
-              <Save className="w-4 h-4 mr-2" />
-              Cập nhật
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Vehicle Details Dialog */}
 

@@ -16,17 +16,22 @@ import {
   TrendingUp,
   Calendar,
   MapPin,
+  Bell,
 } from "lucide-react";
+import socket from "../../setup/socket";
 import { getAllBus, getAllDriver, getAllRoute, getAllSchedule, getAllStudent, getInfoBus, getInfoRoute, getInfoStudentByRouteId, getInfoDriver } from "../../service/adminService";
-
-export default function ManagerDashboard() {
+import { useIsMobile } from "../ui/use-mobile";
+export default function ManagerDashboard({ adminId,
+  notificationsList,
+  setNotificationsList, }) {
   const [allDriverInfo, setAllDriverInfo] = useState("");
   const [allScheduleInfo, setAllScheduleInfo] = useState("");
   const [allBusInfo, setAllBusInfo] = useState("");
   const [allRouteInfo, setAllRouteInfo] = useState("");
   const [allStudentInfo, setAllStudentInfo] = useState("");
   const [upcomingSchedules, setUpcomingSchedules] = useState([]);
-
+  const isMobile = useIsMobile();
+  const [searchTerm, setSearchTerm] = useState("");
   const getAllSchedules = async () => {
     try {
       const res = await getAllSchedule();
@@ -127,6 +132,34 @@ export default function ManagerDashboard() {
     }
   };
 
+  useEffect(() => {
+    const stored = localStorage.getItem(`notifications_${adminId}`);
+    if (stored) {
+      try {
+        setNotificationsList(JSON.parse(stored));
+      } catch {
+        console.error("Lỗi parse JSON notifications");
+      }
+    }
+  }, [adminId, setNotificationsList]);
+
+  /** Mỗi khi danh sách thay đổi → lưu vào localStorage */
+  useEffect(() => {
+    localStorage.setItem(
+      `notifications_${adminId}`,
+      JSON.stringify(notificationsList)
+    );
+  }, [notificationsList, adminId]);
+
+
+
+
+  const filteredNotifications = notificationsList.filter(
+    (n) =>
+      (n.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (n.content || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
 
 
   useEffect(() => {
@@ -137,6 +170,7 @@ export default function ManagerDashboard() {
     getUpcomingSchedules();
     getAllSchedules();
   }, []);
+
 
 
 
@@ -210,7 +244,7 @@ export default function ManagerDashboard() {
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-1 gap-6">
+      <div className="grid lg:grid-cols-3 gap-6">
         {/* Performance Overview */}
         <div className="lg:col-span-2 space-y-6">
 
@@ -256,7 +290,41 @@ export default function ManagerDashboard() {
               </div>
             </CardContent>
           </Card>
+
         </div>
+        {/* Alerts and Notifications */}
+        <div className={`space-y-${isMobile ? "3" : "4"}`}>
+          {filteredNotifications.map((n) => (
+            <Card
+              key={n.id}
+              className={`transition-colors duration-200 ${!n.isRead ? "bg-blue-50" : "bg-white"
+                } hover:bg-blue-100 shadow-sm`}
+            >
+              <CardContent className="flex justify-between items-start gap-3 p-4">
+                <div className="flex gap-3 flex-1 items-start">
+                  {getNotificationIcon(n.type)}
+
+                  <div className="flex flex-col gap-1">
+                    <p className="font-medium text-gray-800">{n.title}</p>
+                    <p className="text-sm text-gray-600">{n.content}</p>
+                    <p className="text-xs text-gray-400">
+                      {formatTimestamp(n.timestamp)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Empty state */}
+          {filteredNotifications.length === 0 && (
+            <Card className="text-center py-8">
+              <Bell className="w-10 h-10 mx-auto text-gray-400 mb-2" />
+              <p className="text-gray-500">Không có thông báo phù hợp</p>
+            </Card>
+          )}
+        </div>
+
 
 
       </div>

@@ -188,39 +188,86 @@ export default function ManagerDrivers() {
   };
 
   const confirmDeleteDriver = async () => {
-    if (!selectedDriver || !selectedDriver.id) {
+    if (!selectedDriver?.id) {
       showError("Lỗi", "Không có tài xế để xóa.");
       setIsDeleteDialogOpen(false);
-      setSelectedDriver(null);
       return;
     }
 
     try {
-      // kiểm tra xem có lịch trình tham chiếu tới tài xế này không
-      const schedRes = await getScheduleByDriverId(selectedDriver.id);
-      const schedules = Array.isArray(schedRes?.data) ? schedRes.data : (schedRes?.data?.DT || []);
-      if (schedules && schedules.length > 0) {
-        showError("Không thể xóa", `Tài xế đang có ${schedules.length} lịch trình liên quan. Vui lòng xóa hoặc chuyển các lịch trình đó trước khi xóa tài xế.`);
+      let schedules = [];
+
+      try {
+        // --- Lấy lịch trình từ API ---
+        const schedRes = await getScheduleByDriverId(selectedDriver.id);
+
+        // Nếu API trả về mảng → dùng, nếu DT=null → mặc định []
+        schedules = Array.isArray(schedRes?.data?.DT) ? schedRes.data.DT : [];
+      } catch (err) {
+        // Nếu API lỗi 404 hoặc không tìm thấy lịch trình → coi như không có lịch trình
+        if (err.response?.status === 404) {
+          console.warn(
+            "Tài xế chưa có lịch trình, tiếp tục cho xoá",
+            err.response?.data?.EM
+          );
+          schedules = [];
+        } else {
+          // Lỗi khác → log và cho phép xoá luôn để không block
+          console.error("Lỗi khi kiểm tra lịch trình, tiếp tục cho xoá:", err);
+          schedules = [];
+        }
+      }
+
+      // Nếu thực sự có lịch trình → không cho xoá
+      if (schedules.length > 0) {
+        showError(
+          "Không thể xóa",
+          `Tài xế đang có ${schedules.length} lịch trình liên quan.`
+        );
         setIsDeleteDialogOpen(false);
         setSelectedDriver(null);
         return;
       }
 
+      // --- Không có lịch trình → xoá ---
       await deleteDriver(selectedDriver.id);
-      console.log("Deleting driver:", selectedDriver);
       system.dataDeleted(`Tài xế ${selectedDriver.username}`);
-      setIsDeleteDialogOpen(false);
-      setSelectedDriver(null);
+
     } catch (error) {
       console.error("Lỗi khi xóa tài xế:", error);
       showError("Không thể xóa tài xế. Vui lòng thử lại!");
-      setIsDeleteDialogOpen(false);
-      setSelectedDriver(null);
     }
+
+    setIsDeleteDialogOpen(false);
+    setSelectedDriver(null);
+
     await getAllDrivers();
   };
 
+
+
   const handleUpdateDriver = async () => {
+    if (
+      !editDriver.username ||
+      !editDriver.phone_number ||
+      !editDriver.address ||
+      !editDriver.email
+    ) {
+      showError("Vui lòng nhập đầy đủ thông tin");
+      return;
+    }
+    // Kiểm tra số điện thoại
+    if (!/^(0|\+84)[0-9]{9,10}$/.test(editDriver.phone_number)) {
+      showError("Vui lòng nhập số điện thoại hợp lệ!!");
+      return;
+    }
+
+    // Kiểm tra email
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editDriver.email)) {
+      showError("Vui lòng nhập email hợp lệ!!");
+      return;
+    }
+
     try {
       await updateDriver(editDriver, editDriver.id);
       console.log("Updating tài xế:", editDriver);
