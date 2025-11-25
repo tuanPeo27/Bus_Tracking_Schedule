@@ -1,9 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { useIsMobile } from "../ui/use-mobile";
 import { Avatar, AvatarFallback } from "../ui/avatar";
+import { useNotificationHelpers } from "../useNotificationHelpers"; 
+import { io } from "socket.io-client";
 import {
   Bell,
   Search,
@@ -17,348 +20,226 @@ import {
   CheckCircle,
 } from "lucide-react";
 
-export default function DriverNotifications({ driverId }) {
+export default function DriverNotifications({ 
+  driverId,
+  notificationsList,
+  setNotificationsList,
+}) {
+  //khoi tao socket io
+  const socket = io("http://26.58.101.232:5000", {
+  transports: ["websocket", "polling"],
+});
+
+  const isMobile = useIsMobile();
+  //State cho tu khoa tim kiem
   const [searchTerm, setSearchTerm] = useState("");
-  const [filter, setFilter] = useState("all");
+  //su dung hook thong bao
+  const { emergencyAlert, showError } = useNotificationHelpers();
 
-  const [notifications, setNotifications] = useState([
-    {
-      id: "NTF001",
-      type: "urgent",
-      title: "Thay đổi lịch trình khẩn cấp",
-      content:
-        "Lịch trình ngày mai (20/12) đã được thay đổi. Thời gian bắt đầu từ 06:30 thay vì 07:00. Vui lòng xác nhận đã nhận được thông báo.",
-      sender: "Phòng Điều Hành",
-      senderType: "admin",
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      isRead: false,
-      requiresAction: true,
-    },
-    {
-      id: "NTF002",
-      type: "message",
-      title: "Tin nhắn từ phụ huynh",
-      content:
-        "Chào anh tài xế, con em tôi (Nguyễn Minh Anh - lớp 10A1) hôm nay sẽ không đi học. Xin cảm ơn anh!",
-      sender: "Bà Nguyễn Thị Lan",
-      senderType: "parent",
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      isRead: false,
-      requiresAction: false,
-    },
-    {
-      id: "NTF003",
-      type: "info",
-      title: "Thông báo bảo dưỡng xe",
-      content:
-        "Xe 29A-12345 đã đến hạn bảo dưỡng định kỳ. Vui lòng đưa xe đến garage vào cuối tuần này.",
-      sender: "Phòng Kỹ Thuật",
-      senderType: "admin",
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-      isRead: true,
-      requiresAction: false,
-    },
-    {
-      id: "NTF004",
-      type: "warning",
-      title: "Cảnh báo thời tiết",
-      content:
-        "Dự báo có mưa lớn vào chiều nay. Anh vui lòng lái xe chậm và cẩn thận, ưu tiên an toàn.",
-      sender: "Hệ thống tự động",
-      senderType: "system",
-      timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
-      isRead: true,
-      requiresAction: false,
-    },
-    {
-      id: "NTF005",
-      type: "message",
-      title: "Yêu cầu thay đổi điểm đón",
-      content:
-        "Xin chào anh, do tình況 đặc biệt, ngày mai em muốn thay đổi điểm đón từ Ngã tư Hàng Xanh sang Chợ Bến Thành. Anh có thể hỗ trợ được không?",
-      sender: "Anh Trần Văn Hoàng",
-      senderType: "parent",
-      timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-      isRead: true,
-      requiresAction: true,
-    },
-  ]);
+  //chay 1 lan khi component duoc mount hoạc driverId thay doi
+  useEffect(() => {
+    const stored = localStorage.getItem(`notifications_${driverId}`);
+    if (stored) {
+      try {
+        setNotificationsList(JSON.parse(stored));
+      } catch {
+        console.error("Lỗi parse JSON notifications");
+      }
+    }
+  }, [driverId, setNotificationsList]);
 
-  const handleMarkAsRead = (notificationId) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
+  //luu thong bao vao localstorage khi co thay doi
+  useEffect(() => {
+    localStorage.setItem(
+      `notifications_${driverId}`,
+      JSON.stringify(notificationsList)
+    );
+  }, [notificationsList, driverId]);
+
+  //danh dau 1 thong bao la da doc
+  const handleMarkAsRead = (id) => {
+    setNotificationsList((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
     );
   };
 
+  //danh dau tat ca thong bao la da doc
   const handleMarkAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setNotificationsList((prev) => prev.map((n) => ({ ...n, isRead: true })));
   };
 
-  const handleConfirmAction = (notificationId) => {
-    setNotifications((prev) =>
-      prev.map((n) =>
-        n.id === notificationId
-          ? { ...n, isRead: true, requiresAction: false }
-          : n
-      )
-    );
-    console.log(`Confirmed action: ${notificationId}`);
+  //xoa 1 thong bao
+  const handleDeleteNotification = (id) => {
+    setNotificationsList((prev) => prev.filter((n) => n.id !== id));
   };
 
-  const handleRejectAction = (notificationId) => {
-    setNotifications((prev) =>
-      prev.map((n) =>
-        n.id === notificationId
-          ? { ...n, isRead: true, requiresAction: false }
-          : n
-      )
-    );
-    console.log(`Rejected action: ${notificationId}`);
+  //xoa tat ca thong bao
+  const handleDeleteAll = () => {
+    setNotificationsList([]);
+    localStorage.removeItem(`notifications_${driverId}`);
   };
 
-  const handleDeleteNotification = (notificationId) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-  };
-
-  const getNotificationIcon = (type) => {
-    switch (type) {
-      case "urgent":
-        return <AlertTriangle className="w-5 h-5 text-red-500" />;
-      case "warning":
-        return <AlertTriangle className="w-5 h-5 text-orange-500" />;
-      case "message":
-        return <MessageSquare className="w-5 h-5 text-blue-500" />;
-      case "info":
-        return <Info className="w-5 h-5 text-green-500" />;
-      default:
-        return <Bell className="w-5 h-5" />;
+  //gui tin hieu khan cap
+  const handleWarning = () => {
+    const message = "Tài xế báo cáo sự cố.";
+    socket.emit(`driver-warning`, {driverId, message});
+    if (typeof emergencyAlert === 'function') {
+        emergencyAlert("Đã gửi tín hiệu khẩn cấp tới trung tâm điều hành!");
+    } else {
+        showError(
+            "Lỗi",
+            "Không thể gửi tín hiệu khẩn cấp. Vui lòng thử lại sau.",
+            0
+          );
     }
   };
 
-  const getSenderAvatar = (senderType, sender) => {
-    const initials = sender
-      .split(" ")
-      .map((w) => w[0])
-      .join("")
-      .slice(0, 2);
-    const bgColor =
-      senderType === "admin"
-        ? "bg-blue-500"
-        : senderType === "parent"
-          ? "bg-green-500"
-          : "bg-gray-500";
+  //dem so thong bao chua doc
+  const unreadCount = notificationsList.filter((n) => !n.isRead).length;
 
-    return (
-      <Avatar className="w-8 h-8">
-        <AvatarFallback className={`${bgColor} text-white`}>
-          {initials}
-        </AvatarFallback>
-      </Avatar>
-    );
+  //loc thong bao theo tu khoa tim kiem
+  const filteredNotifications = notificationsList.filter(
+    (n) =>
+      (n.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (n.content || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  //chon icon theo loai thong bao
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case "arrival":
+        return <Bus className="w-5 h-5 text-blue-500" />;
+      case "delay":
+        return <AlertTriangle className="w-5 h-5 text-red-500" />;
+      case "schedule_change":
+        return <Clock className="w-5 h-5 text-orange-500" />;
+      default:
+        return <Info className="w-5 h-5 text-blue-500" />;
+    }
   };
 
+  //format thoi gian thong bao
   const formatTimestamp = (timestamp) => {
-    const now = new Date();
-    const diff = now - timestamp;
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const time = new Date(timestamp);
+    if (isNaN(time)) return "N/A";
 
+    const now = new Date();
+    const diff = now - time;
+    const minutes = Math.floor(diff / 60000);
+
+    if (minutes < 1) return "Vừa xong";
     if (minutes < 60) return `${minutes} phút trước`;
+
+    const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours} giờ trước`;
+
+    const days = Math.floor(hours / 24);
     return `${days} ngày trước`;
   };
 
-  const filteredNotifications = notifications.filter((notification) => {
-    const match =
-      notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notification.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notification.sender.toLowerCase().includes(searchTerm.toLowerCase());
-
-    if (filter === "unread") return match && !notification.isRead;
-    if (filter === "important")
-      return (
-        match && (notification.type === "urgent" || notification.requiresAction)
-      );
-    return match;
-  });
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
-
+  //render giao dien
   return (
-    <div className="space-y-6">
+    <div className={`space-y-${isMobile ? "4" : "6"} max-w-xl mx-auto`}>
       {/* Header */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="w-5 h-5" />
+      <Card className="shadow-lg">
+        <CardHeader className="flex justify-between items-center">
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+            <Bell className="w-5 h-5 text-gray-700" />
             Thông báo
             {unreadCount > 0 && (
-              <Badge className="bg-red-500 text-white">{unreadCount} mới</Badge>
+              <Badge className="bg-red-500 text-white px-2 py-1 rounded-full text-sm">
+                {unreadCount} mới
+              </Badge>
             )}
           </CardTitle>
+
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleMarkAllAsRead}
+              disabled={unreadCount === 0}
+            >
+              Đọc tất cả
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleDeleteAll}
+              disabled={notificationsList.length === 0}
+            >
+              Xóa tất cả
+            </Button>
+            <Button
+              size="sm"
+              className="bg-yellow-500 hover:bg-yellow-600 text-white"
+              onClick={handleWarning}
+            >
+              Báo cáo sự cố
+            </Button>
+          </div>
         </CardHeader>
 
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm thông báo..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={filter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter("all")}
-              >
-                Tất cả
-              </Button>
-              <Button
-                variant={filter === "unread" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter("unread")}
-              >
-                Chưa đọc ({unreadCount})
-              </Button>
-              <Button
-                variant={filter === "important" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter("important")}
-              >
-                Quan trọng
-              </Button>
-
-              {unreadCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleMarkAllAsRead}
-                  className="text-green-600 hover:text-green-700"
-                >
-                  <CheckCircle className="w-4 h-4 mr-1" />
-                  Đọc tất cả
-                </Button>
-              )}
-            </div>
-          </div>
+          <Input
+            placeholder="Tìm kiếm thông báo..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="mb-3"
+          />
         </CardContent>
       </Card>
 
-      {/* List */}
-      <div className="space-y-4">
-        {filteredNotifications.map((notification) => (
+      {/* Notification list */}
+      <div className={`space-y-${isMobile ? "3" : "4"}`}>
+        {filteredNotifications.map((n) => (
           <Card
-            key={notification.id}
-            className={`${!notification.isRead
-              ? "border-l-4 border-blue-500 bg-blue-50/50"
-              : ""
-              }`}
+            key={n.id}
+            className={`transition-colors duration-200 ${
+              !n.isRead ? "bg-blue-50" : "bg-white"
+            } hover:bg-blue-100 shadow-sm`}
           >
-            <CardContent className="p-4">
-              <div className="flex items-start gap-4">
-                {getNotificationIcon(notification.type)}
+            <CardContent className="flex justify-between items-start gap-3 p-4">
+              <div className="flex gap-3 flex-1 items-start">
+                {getNotificationIcon(n.type)}
 
-                <div className="flex-1 space-y-2">
-                  {/* Title + Time */}
-                  <div className="flex justify-between">
-                    <div>
-                      <h4 className="font-medium flex items-center gap-2">
-                        {notification.title}
-                        {!notification.isRead && (
-                          <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
-                        )}
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        {notification.content}
-                      </p>
-                    </div>
-
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {formatTimestamp(notification.timestamp)}
-                    </span>
-                  </div>
-
-                  {/* Action */}
-                  <div className="flex justify-between items-center">
-                    {/* Sender */}
-                    <div className="flex gap-2 items-center">
-                      {getSenderAvatar(
-                        notification.senderType,
-                        notification.sender
-                      )}
-                      <div className="text-sm leading-tight">
-                        <p className="font-medium">{notification.sender}</p>
-                        <p className="text-muted-foreground text-xs">
-                          {notification.senderType === "admin"
-                            ? "Quản lý"
-                            : notification.senderType === "parent"
-                              ? "Phụ huynh"
-                              : "Hệ thống"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Buttons */}
-                    <div className="flex gap-1">
-                      {notification.requiresAction && (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => handleConfirmAction(notification.id)}
-                          >
-                            <Check className="w-3 h-3 mr-1" /> Xác nhận
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRejectAction(notification.id)}
-                          >
-                            <X className="w-3 h-3 mr-1" /> Từ chối
-                          </Button>
-                        </>
-                      )}
-
-                      {!notification.isRead && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleMarkAsRead(notification.id)}
-                        >
-                          Đánh dấu đã đọc
-                        </Button>
-                      )}
-
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500"
-                        onClick={() =>
-                          handleDeleteNotification(notification.id)
-                        }
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
+                <div className="flex flex-col gap-1">
+                  <p className="font-medium text-gray-800">{n.title}</p>
+                  <p className="text-sm text-gray-600">{n.content}</p>
+                  <p className="text-xs text-gray-400">
+                    {formatTimestamp(n.timestamp)}
+                  </p>
                 </div>
+              </div>
+
+              <div className="flex flex-col gap-2 items-end">
+                {!n.isRead && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleMarkAsRead(n.id)}
+                  >
+                    Đã đọc
+                  </Button>
+                )}
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleDeleteNotification(n.id)}
+                >
+                  <X className="w-4 h-4 text-gray-500" />
+                </Button>
               </div>
             </CardContent>
           </Card>
         ))}
 
+        {/* Empty state */}
         {filteredNotifications.length === 0 && (
-          <Card>
-            <CardContent className="text-center p-8">
-              <Bell className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-              <p>Không có thông báo phù hợp</p>
-            </CardContent>
+          <Card className="text-center py-8">
+            <Bell className="w-10 h-10 mx-auto text-gray-400 mb-2" />
+            <p className="text-gray-500">Không có thông báo phù hợp</p>
           </Card>
         )}
       </div>

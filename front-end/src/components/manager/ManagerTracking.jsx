@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { getAllBus, getAllRoute } from "../../service/adminService";
 import { useNotificationHelpers } from "../useNotificationHelpers";
+import L from "leaflet";
 
 const SOCKET_URL = "http://26.58.101.232:5000"; // giữ như DriverGPS
 
@@ -145,6 +146,13 @@ export default function ManagerTracking() {
     };
   }, []);
 
+  const busIcon = new L.Icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/3448/3448339.png",
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40],
+    className: "bus-marker-icon",
+  });
   // Map markers from vehicles
   const mapMarkers = useMemo(() => {
     return vehicles.map((v) => ({
@@ -157,6 +165,7 @@ export default function ManagerTracking() {
           <h4 class="font-medium text-sm">${v.licensePlate}</h4>
         </div>
       `,
+      icon: busIcon,
     }));
   }, [vehicles]);
 
@@ -245,8 +254,6 @@ export default function ManagerTracking() {
                         <p className="text-xs text-muted-foreground">Cập nhật: {new Date(v.lastUpdate || Date.now()).toLocaleTimeString("vi-VN")}</p>
                       </div>
                     </div>
-
-
                   </div>
                 ))}
               </div>

@@ -230,6 +230,7 @@ export default function ManagerParents() {
             showError("Vui lòng nhập đầy đủ thông tin");
             return;
         }
+
         try {
             console.log("Creating parent:", newParent);
             await createParent(newParent);
@@ -339,6 +340,28 @@ export default function ManagerParents() {
 
 
     const handleUpdateParent = async () => {
+        if (
+            !editParent.username ||
+            !editParent.phone_number ||
+            !editParent.address ||
+            !editParent.email
+        ) {
+            showError("Vui lòng nhập đầy đủ thông tin");
+            return;
+        }
+        // Kiểm tra số điện thoại
+        if (!/^(0|\+84)[0-9]{9,10}$/.test(editParent.phone_number)) {
+            showError("Vui lòng nhập số điện thoại hợp lệ!!");
+            return;
+        }
+
+        // Kiểm tra email
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editParent.email)) {
+            showError("Vui lòng nhập email hợp lệ!!");
+            return;
+        }
+
+
         try {
             await updateParent(editParent, editParent.id);
             console.log("Updating phụ huynh:", editParent);
@@ -552,7 +575,7 @@ export default function ManagerParents() {
                                     Tên
                                 </Label>
                                 <Input
-                                    placeholder="Nguyễn Văn A"
+                                    placeholder="parent01"
                                     value={editParent.username || ""}
                                     onChange={(e) =>
                                         setEditParent({ ...editParent, username: e.target.value })
@@ -684,7 +707,7 @@ export default function ManagerParents() {
                                 Tên
                             </Label>
                             <Input
-                                placeholder="Nguyễn Văn A"
+                                placeholder="parent01"
                                 value={newParent.username}
                                 onChange={(e) =>
                                     setNewParent({ ...newParent, username: e.target.value })

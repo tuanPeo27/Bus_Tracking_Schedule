@@ -135,6 +135,15 @@ export function useNotificationHelpers() {
       `Không thể lấy vị trí: ${message}. Vui lòng kiểm tra quyền truy cập vị trí và tín hiệu GPS.`,
       7000
     );
+  
+  const emergencyAlert = (message) => {
+    // Giả sử bạn có hàm showError, nếu không thì dùng alert tạm
+    if (typeof showError === 'function') {
+        showError("Cảnh báo khẩn cấp!", message, 0);
+    } else {
+        alert(`CẢNH BÁO KHẨN CẤP: ${message}`);
+    }
+  };  
 
   return {
     showSuccess,
@@ -142,5 +151,6 @@ export function useNotificationHelpers() {
     showWarning,
     showInfo,
     system: systemNotifications,
+    emergencyAlert,
   };
 }

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 export default function DriverDashboard({ driverInfo, currentVehicle}) {
-  // Nếu dữ liệu chưa có -> hiển thị thông báo chờ
+  //neu chua co data thi hien thi loading
   if (!driverInfo || !currentVehicle) {
     return (
       <div className="flex justify-center items-center h-64 text-gray-500">
@@ -23,23 +23,15 @@ export default function DriverDashboard({ driverInfo, currentVehicle}) {
       </div>
     );
   }
-
+  // sap xep lich trinh theo thoi gian bat dau
   const sortedSchedules = useMemo(() => {
+    // tra ve mang moi da sap xep
     return [...driverInfo.schedules].sort(
       (a, b) => a.start_time.localeCompare(b.start_time)
     );
   }, [driverInfo]);
 
-  // const currentSchedule = {
-  //   id: "LT001",
-  //   startTime: "07:00",
-  //   endTime: "17:00",
-  //   route: "Tuyến 1: Bến xe Miền Đông - Trường THPT Nguyễn Du",
-  //   status: "active",
-  //   progress: 65,
-  // };
-
-
+  //render giao dien
   return (
     <div className="space-y-6">
       {/* Thông tin tài xế */}
@@ -101,9 +93,6 @@ export default function DriverDashboard({ driverInfo, currentVehicle}) {
                 <div className="font-medium">
                   Ngày: {sch.date}
                 </div>
-                {/* <Badge className="bg-green-100 text-green-800">
-                  {sch.status || "scheduled"}
-                </Badge> */}
               </div>
 
               <div className="flex items-center gap-2">
@@ -112,7 +101,7 @@ export default function DriverDashboard({ driverInfo, currentVehicle}) {
                   {sch.start_time} - {sch.end_time}
                 </span>
               </div>
-
+              {/* chi tiet tuyen duong */}
               <div className="flex items-start gap-2">
                 <Route className="w-4 h-4 mt-1" />
                 <div>
