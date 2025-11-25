@@ -17,6 +17,7 @@ import {
 
   MessageSquare,
   Send,
+  Info,
   Users,
   User,
   Bell,
@@ -146,7 +147,18 @@ export default function ManagerMessages({ adminId,
   };
 
 
-
+const getNotificationIcon = (type) => {
+    switch (type) {
+      case "arrival":
+        return <Bus className="w-5 h-5 text-blue-500" />;
+      case "delay":
+        return <AlertTriangle className="w-5 h-5 text-red-500" />;
+      case "schedule_change":
+        return <Clock className="w-5 h-5 text-orange-500" />;
+      default:
+        return <Info className="w-5 h-5 text-blue-500" />;
+    }
+  };
 
   const formatTimestamp = (date) => {
     const now = new Date();

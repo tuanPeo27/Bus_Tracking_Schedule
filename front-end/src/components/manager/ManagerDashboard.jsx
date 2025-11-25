@@ -12,6 +12,7 @@ import {
   UserCheck,
   AlertTriangle,
   CheckCircle,
+  Info,
   Clock,
   TrendingUp,
   Calendar,
@@ -91,6 +92,37 @@ export default function ManagerDashboard({ adminId,
       res.status(500).json({ message: "Lỗi server" });
     }
   }
+
+  const formatTimestamp = (timestamp) => {
+    const time = new Date(timestamp);
+    if (isNaN(time)) return "N/A";
+
+    const now = new Date();
+    const diff = now - time;
+    const minutes = Math.floor(diff / 60000);
+
+    if (minutes < 1) return "Vừa xong";
+    if (minutes < 60) return `${minutes} phút trước`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} giờ trước`;
+
+    const days = Math.floor(hours / 24);
+    return `${days} ngày trước`;
+  };
+
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case "arrival":
+        return <Bus className="w-5 h-5 text-blue-500" />;
+      case "delay":
+        return <AlertTriangle className="w-5 h-5 text-red-500" />;
+      case "schedule_change":
+        return <Clock className="w-5 h-5 text-orange-500" />;
+      default:
+        return <Info className="w-5 h-5 text-blue-500" />;
+    }
+  };
 
   const getUpcomingSchedules = async () => {
     try {
