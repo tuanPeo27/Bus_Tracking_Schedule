@@ -241,7 +241,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  server.on("disconnect", () => {
+  socket.on("disconnect", () => {
     console.log("Socket disconnected:", socket.id);
   });
 });

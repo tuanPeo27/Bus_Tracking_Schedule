@@ -3,6 +3,8 @@ const User = require("../models/user");
 const Route = require("../models/route");
 const Bus = require("../models/bus");
 const BusStop = require("../models/busStop");
+const Student = require("../models/student");
+const { route } = require("../routes/userRoutes");
 
 exports.getAllSchedules = async (req, res) => {
   try {
@@ -108,6 +110,44 @@ exports.getScheduleByDriverId = async (req, res) => {
   }
 };
 
+exports.getScheduleByStudentId = async (req, res) => {
+  try {
+    const studentId = req.params.studentId;
+
+    const student = await Student.findOne({
+      where: { id: studentId },
+      attributes: ["route_id"],
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        EC: 1,
+        EM: "Không tìm thấy học sinh.",
+        DT: null,
+      });
+    }
+
+    const schedules = await Schedule.findAll({
+      where: { route_id: student.route_id },
+      include: [
+        {
+          model: Route,
+          attributes: ["id", "name", "start_point", "end_point"],
+        },
+      ],
+    });
+
+    res.status(200).json({
+      EC: 0,
+      EM: "Lấy danh sách lịch trình của học sinh.",
+      DT: schedules,
+    });
+  } catch (error) {
+    console.error("Lỗi lấy lịch trình của học sinh:", error);
+    res.status(500).json({ EC: -1, EM: "Lỗi server.", DT: null });
+  }
+};
+
 exports.createSchedule = async (req, res) => {
   try {
     const { date, start_time, end_time, route_id, bus_id, driver_id } =
@@ -193,7 +233,14 @@ exports.editSchedule = async (req, res) => {
 exports.editScheduleById = async (req, res) => {
   try {
     const scheduleId = req.params.id;
-    const { date, time, route_id, bus_id, driver_id, status: scheduleStatus } = req.body;
+    const {
+      date,
+      time,
+      route_id,
+      bus_id,
+      driver_id,
+      status: scheduleStatus,
+    } = req.body;
     const schedule = await Schedule.findOne({
       where: { id: scheduleId },
     });

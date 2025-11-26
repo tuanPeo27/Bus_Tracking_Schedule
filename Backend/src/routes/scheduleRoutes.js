@@ -10,6 +10,11 @@ router.get(
   verifyToken,
   scheduleController.getScheduleByDriverId
 );
+router.get(
+  "/student/:studentId",
+  verifyToken,
+  scheduleController.getScheduleByStudentId
+);
 router.post(
   "/create",
   verifyToken,
