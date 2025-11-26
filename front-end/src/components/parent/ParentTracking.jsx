@@ -114,7 +114,6 @@ export function ParentTracking({ studentInfo, routeInfo }) {
       if (res?.data?.EC === 0) {
         const scheduleData = res.data.DT || {};
         setScheduleInfo(scheduleData);
-        console.log("Schedule info loaded:", scheduleData);
       }
     } catch (e) {
       console.error("Error loading schedule info", e);
@@ -129,9 +128,7 @@ export function ParentTracking({ studentInfo, routeInfo }) {
   useEffect(() => {
     const handleLocationUpdate = (data) => {
       try {
-        console.log("Vị trí xe cập nhật:", data);
-        console.log("Thông tin lịch trình hiện tại:", scheduleInfo[0]);
-        if (scheduleInfo[0]?.bus_id === data.busId){
+        if (scheduleInfo[0].bus_id === data.busId){
           setCurrentLocation({
             lat: data.latitude,
             lng: data.longitude,
@@ -149,7 +146,7 @@ export function ParentTracking({ studentInfo, routeInfo }) {
     return () => {
         socket.off("bus-location-update", handleLocationUpdate);
     };
-  }, [socket]); // Chỉ chạy lại khi biến socket thay đổi (thường là chỉ 1 lần)
+  }, [socket, scheduleInfo]); // Chỉ chạy lại khi biến socket thay đổi (thường là chỉ 1 lần)
 
   // ---- GEOAPIFY FETCH ----
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
