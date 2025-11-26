@@ -85,23 +85,15 @@ export default function ManagerMessages({ adminId,
 
     try {
       console.log("Prepare send notification", { selectedRecipient, recipientCategory, specificRecipient, payload });
+
       showInfo("Đang gửi", "Tin nhắn đang được gửi lên server...");
 
-      // helper để emit với ack + fallback timeout
       const emitWithAck = (eventPayload, successMsg) => {
-        let acked = false;
-        socket.emit("manager-send-notification", eventPayload, (ack) => {
-          acked = true;
-          if (ack?.ok) showSuccess("Thành công", successMsg);
-          else showError("Lỗi", ack?.message || "Server trả về lỗi");
-        });
-        setTimeout(() => {
-          if (!acked) {
-            showError("Lỗi", "Không nhận phản hồi từ server sau 5s. Kiểm tra kết nối hoặc server.");
-            console.warn("No ack from server for payload", eventPayload);
-          }
-        }, 5000);
+        socket.emit("manager-send-notification", eventPayload);
+        showSuccess("Thành công", successMsg);
       };
+
+
 
       if (selectedRecipient === "all_parents") {
         // chính: gửi cho server xử lý broadcast
@@ -147,7 +139,7 @@ export default function ManagerMessages({ adminId,
   };
 
 
-const getNotificationIcon = (type) => {
+  const getNotificationIcon = (type) => {
     switch (type) {
       case "arrival":
         return <Bus className="w-5 h-5 text-blue-500" />;
@@ -161,14 +153,18 @@ const getNotificationIcon = (type) => {
   };
 
   const formatTimestamp = (date) => {
+    const d = new Date(date);  // ép string → Date
+
     const now = new Date();
-    const diff = now.getTime() - date.getTime();
+    const diff = now.getTime() - d.getTime();
+
     const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
 
     if (minutes < 60) return `${minutes} phút trước`;
     return `${hours} giờ trước`;
   };
+
 
 
   useEffect(() => {
