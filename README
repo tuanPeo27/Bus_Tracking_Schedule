@@ -1,2 +1,304 @@
-cd Backend
+# 🚌 Hệ thống Quản lý Xe Buýt  
+**Bus Tracking & Management System**
+
+Hệ thống quản lý xe buýt hiện đại với giao diện web trực quan, hỗ trợ **theo dõi GPS realtime**, **quản lý người dùng**, **quản lý tuyến đường**, **lịch trình**, **thông báo realtime**, cùng **phân quyền đầy đủ** (Admin – Driver – Parent).
+
+---
+
+## 📋 Mục Lục
+- [🚀 Cài đặt hệ thống](#-cài-đặt-hệ-thống)
+- [📘 Hướng dẫn sử dụng](#-hướng-dẫn-sử-dụng)
+- [✨ Tính năng chính](#-tính-năng-chính)
+- [🔐 Phân quyền người dùng](#-phân-quyền-người-dùng)
+- [📡 API Documentation](#-api-documentation)
+- [🛠️ Troubleshooting](#️-troubleshooting)
+- [🤝 Đóng góp](#-đóng-góp)
+
+---
+
+# 🚀 Cài đặt hệ thống
+
+## **Bước 1: Yêu cầu hệ thống**
+- Node.js 18+  
+- MySQL Server  
+- Git  
+
+---
+
+## **Bước 2: Clone và cài đặt**
+
+```sh
+# Clone repository
+git clone https://github.com/vinh3123410433/QuanLyXeBustest.git
+cd QuanLyXeBustest
+```
+
+### 🔧 Cài đặt Backend
+```sh
+cd backend
+npm install
+```
+
+### 🎨 Cài đặt Frontend
+```sh
+cd ../frontend
+npm install
+```
+
+---
+
+## **Bước 3: Cấu hình Database**
+
+### 1️⃣ Tạo database
+```sql
+CREATE DATABASE QuanLyXeBuyt;
+```
+
+### 2️⃣ Import database khởi tạo
+```sh
+mysql -u root -p QuanLyXeBuyt < backend/database/init.sql
+```
+
+---
+
+## **Bước 4: Cấu hình môi trường (.env)**
+
+```sh
+cp .env.example .env
+cp .env.example backend/.env
+cp .env.example frontend/.env
+```
+
+### ✨ Cấu hình mẫu .env
+```env
+PORT=5000
+DB_NAME=bus_tracking
+DB_USER=root
+DB_PASS=yourpassword
+DB_HOST=localhost
+JWT_SECRET=bus_tracking_secret
+```
+
+> 🔒 *Lưu ý: File `.env` đã được thêm vào `.gitignore`.*
+
+---
+
+## **Bước 5: Chạy hệ thống**
+
+### ▶️ Backend
+```sh
+cd backend
 npm run dev
+```
+
+### ▶️ Frontend
+```sh
+cd frontend
+npm run dev
+```
+
+---
+
+## **Bước 6: Truy cập hệ thống**
+- Frontend: **http://localhost:3000**
+- Backend API: **http://localhost:5000/api**
+
+---
+
+# 👤 Tài khoản mẫu
+
+### **Admin**
+- Username: admin1  
+- Password: 654321
+
+### **Driver**
+- Email: driver1  
+- Password: 654321
+
+### **Parent**
+- Email: parent1  
+- Password: 654321
+
+---
+
+# ✨ Tính năng chính
+
+## 🗂️ Quản lý người dùng
+- Đăng ký / đăng nhập bằng JWT  
+- 3 phân quyền: Admin – Driver – Parent  
+- Cập nhật hồ sơ  
+- Bảo mật: Hash password, refresh token  
+
+## 🚌 Quản lý xe buýt
+- Thêm / sửa / xoá xe  
+- Quản lý biển số, sức chứa, model  
+- Gán tài xế  
+- Theo dõi trạng thái (Active, Maintenance...)  
+
+## 🗺️ Quản lý tuyến đường
+- Tạo tuyến  
+- Quản lý điểm dừng  
+- Tính khoảng cách – thời gian  
+- Xem tuyến trên bản đồ  
+
+## 📅 Quản lý lịch trình
+- Lịch đưa đón theo tuần  
+- Gán xe – tài xế cho tuyến  
+- Gửi thông báo thay đổi lịch  
+
+## 🛰️ GPS Realtime (Socket.io)
+- Cập nhật vị trí xe buýt theo thời gian thực  
+- Map tương tác Leaflet  
+
+## 🔔 Hệ thống thông báo
+- Xe đến gần điểm dừng  
+- Admin gửi thông báo chung  
+- Lưu lịch sử notification trên localStorage  
+
+---
+
+# 🔐 Phân quyền người dùng
+
+## 👨‍💼 **Admin**
+✔ Quản lý tất cả người dùng  
+✔ Quản lý xe – tài xế  
+✔ Quản lý tuyến – lịch trình  
+✔ Xem báo cáo  
+
+## 🚐 **Driver**
+✔ Xem lịch trình  
+✔ Cập nhật GPS  
+✔ Báo cáo tình trạng xe  
+✔ Xem học sinh trên xe  
+
+## 👨‍👩‍👧‍👦 **Parent**
+✔ Theo dõi xe realtime  
+✔ Nhận thông báo  
+✔ Xem thông tin con  
+
+---
+
+# 📡 API Documentation
+
+## 📌 Authentication  
+```
+POST /api/user/login  
+POST /api/user/forgotpass  
+POST /api/user/create/admin  
+DELETE /api/user/delete/:id  
+```
+
+## 👦 Student API  
+```
+GET /api/students
+GET /api/students/:id
+GET /api/students/parent/:id
+POST /api/students/create
+PUT /api/students/edit/:id
+DELETE /api/students/delete/:id
+```
+
+## 🚌 Bus API  
+```
+GET /api/buses  
+POST /api/buses/create  
+PUT /api/buses/edit/:id  
+DELETE /api/buses/delete/:id  
+```
+
+## 🗺️ Route API  
+```
+GET /api/routes
+GET /api/routes/:id
+POST /api/routes/create
+PUT /api/routes/edit/:id
+DELETE /api/routes/delete/:id
+```
+
+## 🚐 Driver API  
+```
+GET /api/drivers
+GET /api/drivers/:id
+POST /api/drivers/create
+PUT /api/drivers/edit/:id
+DELETE /api/drivers/delete/:id
+```
+
+## 👨‍👩‍👧 Parent API  
+```
+GET /api/parents
+GET /api/parents/:id
+POST /api/parents/create
+PUT /api/parents/edit/:id
+DELETE /api/parents/delete/:id
+```
+
+## 📅 Schedule API  
+```
+GET /api/schedules
+GET /api/schedules/:id
+GET /api/schedules/driver/:driverId
+GET /api/schedules/student/:studentId
+POST /api/schedules/create
+PUT /api/schedules/edit/:id
+DELETE /api/schedules/delete/:id
+```
+
+---
+
+# 🛠️ Troubleshooting
+
+### ❌ Không kết nối được database  
+- Kiểm tra DB trong `.env`  
+- Kiểm tra MySQL service  
+- Kiểm tra quyền user DB  
+
+### ❌ Không chạy được server  
+- Kiểm tra lỗi trong terminal  
+- Kiểm tra Node.js version  
+- Cài lại dependencies  
+
+### ❌ API không phản hồi  
+- Test bằng Postman  
+- Kiểm tra console backend  
+- Đảm bảo đúng URL + method  
+
+---
+
+# 🔧 Commands hữu ích
+
+```sh
+# Kiểm tra port đang sử dụng
+netstat -ano | findstr :3000
+
+# Kiểm tra port 5173
+netstat -ano | findstr :5173
+
+# Xóa node_modules và cài lại
+rm -rf node_modules package-lock.json
+npm install
+
+# Restart MySQL (Windows)
+net stop mysql80
+net start mysql80
+```
+
+---
+
+# 🤝 Đóng góp
+
+## Quy trình
+1. Fork repo  
+2. Clone về máy  
+3. Tạo branch mới  
+4. Commit với message rõ ràng  
+5. Push và tạo Pull Request  
+
+## Coding Standards
+- ESLint + Prettier  
+- Tên biến: camelCase  
+- Tên file: kebab-case  
+- Commit tiếng Việt có dấu  
+
+---
+
