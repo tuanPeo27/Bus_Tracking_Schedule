@@ -29,7 +29,7 @@ Hệ thống quản lý xe buýt hiện đại với giao diện web trực quan
 
 ```sh
 # Clone repository
-git clone https://github.com/vinh3123410433/QuanLyXeBustest.git
+git clone https://github.com/tuanPeo27/BUS_CODE.git
 cd QuanLyXeBustest
 ```
 
