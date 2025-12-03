@@ -34,19 +34,21 @@ import {
 import { getStudentsByScheduleId } from "../../service/driverService";
 
 export default function DriverStudents({ scheduleId }) {
+  //state cho hoc sinh, hoc sinh duoc chon, loc diem danh
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [attendanceFilter, setAttendanceFilter] = useState("all");
   const { showSuccess, showInfo } = useNotificationHelpers();
 
-  // Khởi tạo students từ localStorage nếu có
+  //khoi tao state cho danh sach hoc sinh
   const [students, setStudents] = useState(() => {
     const savedStudents = localStorage.getItem('driverStudents');
     return savedStudents ? JSON.parse(savedStudents) : [];
   });
+  //state cho loading
   const [isLoading, setIsLoading] = useState(false);
-
+  //state cho thong tin lich trinh
   const [scheduleInfo, setScheduleInfo] = useState(null);
-
+  //ham lay danh sach hoc sinh theo scheduleId
   const fetchStudentsForSchedule = async (id) => {
     if (id === null || id === undefined || id === "") {
       console.warn("scheduleId không hợp lệ, bỏ qua fetch. Giá trị hiện tại:", id, "Type:", typeof id);
@@ -60,15 +62,15 @@ export default function DriverStudents({ scheduleId }) {
       if (response && response.data && response.data.EC === 0) {
         const data = response.data.DT;
         console.log("Dữ liệu DT:", data);
-
+        //cap nhat thong tin lich trinh
         setScheduleInfo({
           schedule_id: data.schedule_id,
           route_id: data.route_id,
         });
-
+        //xu ly danh sach hoc sinh
         const studentsFromApi = Array.isArray(data.students) ? data.students : [];
         console.log("studentsFromApi:", studentsFromApi);
-
+        //kiem tra va cap nhat state
         if (studentsFromApi.length > 0) {
           const studentsWithAttendance = studentsFromApi.map((student) => {
             if (!student || typeof student !== "object") {
@@ -82,7 +84,7 @@ export default function DriverStudents({ scheduleId }) {
           }).filter(Boolean);
 
           console.log("studentsWithAttendance:", studentsWithAttendance);
-
+          //chi cap nhat neu co student hop le
           if (studentsWithAttendance.length > 0) {
             setStudents(studentsWithAttendance); // Set state và lưu vào localStorage
             localStorage.setItem('driverStudents', JSON.stringify(studentsWithAttendance)); // Lưu lại
@@ -104,20 +106,20 @@ export default function DriverStudents({ scheduleId }) {
       setIsLoading(false);
     }
   };
-
+  //useEffect de lay danh sach hoc sinh khi scheduleId thay doi
   useEffect(() => {
     console.log("useEffect chạy với scheduleId:", scheduleId, "Type:", typeof scheduleId);
     fetchStudentsForSchedule(scheduleId);
   }, [scheduleId]);
-
+  //useEffect de luu danh sach hoc sinh vao localstorage khi co thay doi
   useEffect(() => {
     console.log("Học sinh SAU KHI set (state hiện tại):", students);
   }, [students]);
-
+  //ham cap nhat diem danh
   const updateAttendance = (studentId, attendance) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
-
+    //cap nhat state
     setStudents((prev) =>
       prev.map((s) => (s.id === studentId ? { ...s, attendance } : s))
     );
@@ -128,7 +130,7 @@ export default function DriverStudents({ scheduleId }) {
       showInfo(`Cập nhật điểm danh`, `${student.name} đã được đánh dấu vắng mặt`);
     }
   };
-
+  //ham hien thi badge diem danh
   const getAttendanceBadge = (attendance) => {
     switch (attendance) {
       case "present":
@@ -141,7 +143,7 @@ export default function DriverStudents({ scheduleId }) {
         return <Badge variant="outline">Chưa rõ</Badge>;
     }
   };
-
+  //ham hien thi icon diem danh
   const getAttendanceIcon = (attendance) => {
     switch (attendance) {
       case "present":
@@ -152,9 +154,9 @@ export default function DriverStudents({ scheduleId }) {
         return <AlertCircle className="w-5 h-5 text-yellow-600" />;
     }
   };
-
+  //loc danh sach hoc sinh theo diem danh
   const studentList = Array.isArray(students) ? students : [];
-
+  //loc theo attendanceFilter
   const filteredStudents = studentList.filter((student) => {
     if (!student || typeof student !== "object") {
       return false;
@@ -184,6 +186,7 @@ export default function DriverStudents({ scheduleId }) {
     );
   }
 
+  //render giao dien
   return (
     <div className="space-y-4">
       {scheduleInfo && (
