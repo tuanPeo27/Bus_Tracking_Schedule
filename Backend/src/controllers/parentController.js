@@ -130,3 +130,22 @@ exports.editParentById = async (req, res) => {
     res.status(500).json({ EC: -1, EM: "Lỗi server.", DT: null });
   }
 };
+
+exports.deleteParentById = async (req, res) => {
+  try {
+    const parentId = req.params.id;
+    const parent = await User.findOne({
+      where: { id: parentId, role: "parent" },
+    });
+    if (!parent) {
+      return res
+        .status(404)
+        .json({ EC: 1, EM: "Phụ huynh không tồn tại.", DT: null });
+    }
+    await parent.destroy();
+    res.status(200).json({ EC: 0, EM: "Xóa phụ huynh thành công.", DT: null });
+  } catch (error) {
+    console.error("Lỗi xóa phụ huynh:", error);
+    res.status(500).json({ EC: -1, EM: "Lỗi server.", DT: null });
+  }
+};

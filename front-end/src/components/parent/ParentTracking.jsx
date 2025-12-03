@@ -4,7 +4,7 @@ import { Badge } from "../ui/badge";
 import { useIsMobile } from "../ui/use-mobile";
 import { LeafletMap } from "../map/LeafletMap";
 import { io } from "socket.io-client";
-import { getBusStopsByRouteId } from "../../service/driverService";
+import { getBusStopsByRouteId, getScheduleByStudentId } from "../../service/driverService";
 import L from "leaflet";
 
 const GEOAPIFY_KEY = "2b833a5c3c1649d89c2e52d7976c7534";
@@ -32,6 +32,7 @@ export function ParentTracking({ studentInfo, routeInfo }) {
   const [busStops, setBusStops] = useState([]);
 
   // Static & dynamic route
+  const [scheduleInfo, setScheduleInfo] = useState(null);
   const [staticRouteCoords, setStaticRouteCoords] = useState([]);
   const [driverToFirstStopCoords, setDriverToFirstStopCoords] = useState([]);
   const [routeStatus, setRouteStatus] = useState("idle");
@@ -104,14 +105,35 @@ export function ParentTracking({ studentInfo, routeInfo }) {
     // Dùng chuỗi ID làm dependency để tránh infinite loop
   }, [routeIdsString]); 
 
+  useEffect(() => {
+  if (!students || students.length === 0) return;
+
+  const fetchScheduleInfo = async () => {
+    try {
+      const res = await getScheduleByStudentId(students[0]?.id);
+      if (res?.data?.EC === 0) {
+        const scheduleData = res.data.DT || {};
+        setScheduleInfo(scheduleData);
+      }
+    } catch (e) {
+      console.error("Error loading schedule info", e);
+    }
+  };
+
+  fetchScheduleInfo();
+}, [students]);
+
+
   // ---- SỬA LỖI 2: SOCKET LISTENER ----
   useEffect(() => {
     const handleLocationUpdate = (data) => {
       try {
-        setCurrentLocation({
-          lat: data.latitude,
-          lng: data.longitude,
-        });
+        if (scheduleInfo[0].bus_id === data.busId){
+          setCurrentLocation({
+            lat: data.latitude,
+            lng: data.longitude,
+          });
+        }
       } catch (error) {
         console.log(error);
       }
@@ -124,7 +146,7 @@ export function ParentTracking({ studentInfo, routeInfo }) {
     return () => {
         socket.off("bus-location-update", handleLocationUpdate);
     };
-  }, [socket]); // Chỉ chạy lại khi biến socket thay đổi (thường là chỉ 1 lần)
+  }, [socket, scheduleInfo]); // Chỉ chạy lại khi biến socket thay đổi (thường là chỉ 1 lần)
 
   // ---- GEOAPIFY FETCH ----
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

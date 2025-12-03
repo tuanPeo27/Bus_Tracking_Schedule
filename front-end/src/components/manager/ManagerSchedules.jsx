@@ -567,7 +567,7 @@ export default function ManagerSchedules() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Bus className="w-4 h-4" />
-                          {schedule.busInfo?.data?.DT?.brand}-{schedule.busInfo?.data?.DT?.model}
+                          {schedule.busInfo?.data?.DT?.license_plate}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -771,7 +771,7 @@ export default function ManagerSchedules() {
                   <SelectContent>
                     {listBus.map((bus) => (
                       <SelectItem key={bus.id} value={bus.id}>
-                        {bus.brand} {bus.model}
+                        {bus.license_plate}
                       </SelectItem>
                     ))}
                   </SelectContent>
