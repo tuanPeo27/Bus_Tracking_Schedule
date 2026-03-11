@@ -26,7 +26,7 @@ export default function DriverNotifications({
   setNotificationsList,
 }) {
   //khoi tao socket io
-  const socket = io("http://26.58.101.232:5000", {
+  const socket = io("http://localhost:5000", {
   transports: ["websocket", "polling"],
 });
 

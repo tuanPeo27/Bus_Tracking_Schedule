@@ -169,7 +169,7 @@ export default function DriverGPS({ schedule_id, route_id, vehicle_id }) {
   const isFetchingStatic = useRef(false);
   const isFetchingDynamic = useRef(false);
   //tao socket
-  const socket = useMemo(() => io("http://26.58.101.232:5000"), []);
+  const socket = useMemo(() => io("http://localhost:5000"), []);
   const emitIntervalRef = useRef(null);
   const vehicleIdRef = useRef(vehicle_id);
   

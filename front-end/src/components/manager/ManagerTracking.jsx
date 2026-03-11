@@ -27,7 +27,7 @@ import { getAllBus, getAllRoute } from "../../service/adminService";
 import { useNotificationHelpers } from "../useNotificationHelpers";
 import L from "leaflet";
 
-const SOCKET_URL = "http://26.58.101.232:5000"; // giữ như DriverGPS
+const SOCKET_URL = "http://localhost:5000"; // giữ như DriverGPS
 
 export default function ManagerTracking() {
   const { showError, showSuccess } = useNotificationHelpers();

@@ -40,7 +40,7 @@ export function ParentTracking({ studentInfo, routeInfo }) {
   const isFetchingStatic = useRef(false);
   const isFetchingDynamic = useRef(false);
 
-  const socket = useMemo(() => io("http://26.58.101.232:5000"), []);
+  const socket = useMemo(() => io("http://localhost:5000"), []);
   const STOP_REMOVE_RADIUS = 100;
 
   const distanceMeters = (a, b) => {

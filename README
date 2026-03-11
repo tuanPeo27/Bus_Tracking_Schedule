@@ -1,76 +1,178 @@
-# 🚌 Hệ thống Quản lý Xe Buýt  
-**Bus Tracking & Management System**
+# 🚌 Bus Tracking & Management System
 
-Hệ thống quản lý xe buýt hiện đại với giao diện web trực quan, hỗ trợ **theo dõi GPS realtime**, **quản lý người dùng**, **quản lý tuyến đường**, **lịch trình**, **thông báo realtime**, cùng **phân quyền đầy đủ** (Admin – Driver – Parent).
+![Node.js](https://img.shields.io/badge/Node.js-18+-green?logo=node.js)
+![Express](https://img.shields.io/badge/Express.js-Backend-black?logo=express)
+![MySQL](https://img.shields.io/badge/MySQL-Database-blue?logo=mysql)
+![Socket.io](https://img.shields.io/badge/Socket.io-Realtime-black?logo=socketdotio)
+![License](https://img.shields.io/badge/License-Educational-orange)
 
----
+A **web-based bus management and tracking system** that allows administrators, drivers, and parents to monitor bus routes, schedules, and real-time locations.
 
-## 📋 Mục Lục
-- [🚀 Cài đặt hệ thống](#-cài-đặt-hệ-thống)
-- [📘 Hướng dẫn sử dụng](#-hướng-dẫn-sử-dụng)
-- [✨ Tính năng chính](#-tính-năng-chính)
-- [🔐 Phân quyền người dùng](#-phân-quyền-người-dùng)
-- [📡 API Documentation](#-api-documentation)
-- [🛠️ Troubleshooting](#️-troubleshooting)
-- [🤝 Đóng góp](#-đóng-góp)
+The system provides **GPS tracking**, **route management**, **schedule management**, and **real-time notifications** through an intuitive web interface.
+
+This project was developed by a **team of 3 members** as part of a software engineering project.
 
 ---
 
-# 🚀 Cài đặt hệ thống
+# 🚀 Features
 
-## **Bước 1: Yêu cầu hệ thống**
-- Node.js 18+  
-- MySQL Server  
-- Git  
+## 👤 User Management
+
+* User registration and login using **JWT authentication**
+* Role-based access control
+* Profile management
+* Secure password hashing
+
+## 🚌 Bus Management
+
+* Add / edit / delete buses
+* Manage bus information (license plate, capacity, model)
+* Assign drivers to buses
+* Track bus status (active, maintenance)
+
+## 🗺 Route Management
+
+* Create and manage bus routes
+* Manage bus stops
+* View routes on an interactive map
+
+## 📅 Schedule Management
+
+* Weekly bus schedules
+* Assign buses and drivers to routes
+* Update and manage schedule changes
+
+## 🛰 Real-time Bus Tracking
+
+* Real-time GPS tracking using **Socket.io**
+* Interactive map using **Leaflet**
+
+## 🔔 Notification System
+
+* Receive notifications when buses approach stops
+* Admin broadcast notifications
+* Store notification history
 
 ---
 
-## **Bước 2: Clone và cài đặt**
+# 🔐 User Roles
 
-```sh
-# Clone repository
+## 👨‍💼 Admin
+
+* Manage users
+* Manage buses and drivers
+* Manage routes and schedules
+* View reports
+
+## 🚐 Driver
+
+* View assigned schedules
+* Update GPS location
+* Report vehicle status
+* View students on the bus
+
+## 👨‍👩‍👧 Parent
+
+* Track bus location in real time
+* Receive notifications
+* View student information
+
+---
+
+# 🏗 System Architecture
+
+```
+Frontend (JavaScript / Web UI)
+        │
+        ▼
+REST API (Node.js + Express)
+        │
+        ▼
+MySQL Database
+        │
+        ▼
+Realtime Tracking (Socket.io + GPS)
+```
+
+---
+
+# 🛠 Tech Stack
+
+| Technology              | Usage                   |
+| ----------------------- | ----------------------- |
+| Node.js                 | Backend runtime         |
+| Express.js              | Backend framework       |
+| MySQL                   | Database                |
+| Socket.io               | Real-time communication |
+| Leaflet                 | Map visualization       |
+| React                   | Frontend                |
+
+---
+
+# ⚙️ Installation
+
+## 1️⃣ Requirements
+
+* Node.js 18+
+* MySQL Server
+* Git
+
+---
+
+## 2️⃣ Clone Repository
+
+```bash
 git clone https://github.com/tuanPeo27/BUS_CODE.git
 cd QuanLyXeBustest
 ```
 
-### 🔧 Cài đặt Backend
-```sh
+---
+
+## 3️⃣ Install Dependencies
+
+### Backend
+
+```bash
 cd backend
 npm install
 ```
 
-### 🎨 Cài đặt Frontend
-```sh
+### Frontend
+
+```bash
 cd ../frontend
 npm install
 ```
 
 ---
 
-## **Bước 3: Cấu hình Database**
+## 4️⃣ Setup Database
 
-### 1️⃣ Tạo database
+Create database:
+
 ```sql
 CREATE DATABASE QuanLyXeBuyt;
 ```
 
-### 2️⃣ Import database khởi tạo
-```sh
+Import initial data:
+
+```bash
 mysql -u root -p QuanLyXeBuyt < backend/database/init.sql
 ```
 
 ---
 
-## **Bước 4: Cấu hình môi trường (.env)**
+## 5️⃣ Environment Configuration
 
-```sh
+Create `.env` file:
+
+```bash
 cp .env.example .env
-cp .env.example backend/.env
-cp .env.example frontend/.env
 ```
 
-### ✨ Cấu hình mẫu .env
-```env
+Example configuration:
+
+```
 PORT=5000
 DB_NAME=bus_tracking
 DB_USER=root
@@ -79,116 +181,82 @@ DB_HOST=localhost
 JWT_SECRET=bus_tracking_secret
 ```
 
-> 🔒 *Lưu ý: File `.env` đã được thêm vào `.gitignore`.*
-
 ---
 
-## **Bước 5: Chạy hệ thống**
+## 6️⃣ Run the Application
 
-### ▶️ Backend
-```sh
+### Start Backend
+
+```bash
 cd backend
 npm run dev
 ```
 
-### ▶️ Frontend
-```sh
+### Start Frontend
+
+```bash
 cd frontend
 npm run dev
 ```
 
 ---
 
-## **Bước 6: Truy cập hệ thống**
-- Frontend: **http://localhost:3000**
-- Backend API: **http://localhost:5000/api**
+## 7️⃣ Access the System
+
+Frontend:
+
+```
+http://localhost:3000
+```
+
+Backend API:
+
+```
+http://localhost:5000/api
+```
 
 ---
 
-# 👤 Tài khoản mẫu
+# 👤 Demo Accounts
 
-### **Admin**
-- Username: admin1  
-- Password: 654321
+### Admin
 
-### **Driver**
-- Email: driver1  
-- Password: 654321
+```
+Username: admin1
+Password: 654321
+```
 
-### **Parent**
-- Email: parent1  
-- Password: 654321
+### Driver
 
----
+```
+Email: driver1
+Password: 654321
+```
 
-# ✨ Tính năng chính
+### Parent
 
-## 🗂️ Quản lý người dùng
-- Đăng ký / đăng nhập bằng JWT  
-- 3 phân quyền: Admin – Driver – Parent  
-- Cập nhật hồ sơ  
-- Bảo mật: Hash password, refresh token  
-
-## 🚌 Quản lý xe buýt
-- Thêm / sửa / xoá xe  
-- Quản lý biển số, sức chứa, model  
-- Gán tài xế  
-- Theo dõi trạng thái (Active, Maintenance...)  
-
-## 🗺️ Quản lý tuyến đường
-- Tạo tuyến  
-- Quản lý điểm dừng  
-- Tính khoảng cách – thời gian  
-- Xem tuyến trên bản đồ  
-
-## 📅 Quản lý lịch trình
-- Lịch đưa đón theo tuần  
-- Gán xe – tài xế cho tuyến  
-- Gửi thông báo thay đổi lịch  
-
-## 🛰️ GPS Realtime (Socket.io)
-- Cập nhật vị trí xe buýt theo thời gian thực  
-- Map tương tác Leaflet  
-
-## 🔔 Hệ thống thông báo
-- Xe đến gần điểm dừng  
-- Admin gửi thông báo chung  
-- Lưu lịch sử notification trên localStorage  
-
----
-
-# 🔐 Phân quyền người dùng
-
-## 👨‍💼 **Admin**
-✔ Quản lý tất cả người dùng  
-✔ Quản lý xe – tài xế  
-✔ Quản lý tuyến – lịch trình  
-✔ Xem báo cáo  
-
-## 🚐 **Driver**
-✔ Xem lịch trình  
-✔ Cập nhật GPS  
-✔ Báo cáo tình trạng xe  
-✔ Xem học sinh trên xe  
-
-## 👨‍👩‍👧‍👦 **Parent**
-✔ Theo dõi xe realtime  
-✔ Nhận thông báo  
-✔ Xem thông tin con  
+```
+Email: parent1
+Password: 654321
+```
 
 ---
 
 # 📡 API Documentation
 
-## 📌 Authentication  
+## Authentication
+
 ```
-POST /api/user/login  
-POST /api/user/forgotpass  
-POST /api/user/create/admin  
-DELETE /api/user/delete/:id  
+POST /api/user/login
+POST /api/user/forgotpass
+POST /api/user/create/admin
+DELETE /api/user/delete/:id
 ```
 
-## 👦 Student API  
+---
+
+## Student API
+
 ```
 GET /api/students
 GET /api/students/:id
@@ -198,15 +266,21 @@ PUT /api/students/edit/:id
 DELETE /api/students/delete/:id
 ```
 
-## 🚌 Bus API  
+---
+
+## Bus API
+
 ```
-GET /api/buses  
-POST /api/buses/create  
-PUT /api/buses/edit/:id  
-DELETE /api/buses/delete/:id  
+GET /api/buses
+POST /api/buses/create
+PUT /api/buses/edit/:id
+DELETE /api/buses/delete/:id
 ```
 
-## 🗺️ Route API  
+---
+
+## Route API
+
 ```
 GET /api/routes
 GET /api/routes/:id
@@ -215,7 +289,10 @@ PUT /api/routes/edit/:id
 DELETE /api/routes/delete/:id
 ```
 
-## 🚐 Driver API  
+---
+
+## Driver API
+
 ```
 GET /api/drivers
 GET /api/drivers/:id
@@ -224,7 +301,10 @@ PUT /api/drivers/edit/:id
 DELETE /api/drivers/delete/:id
 ```
 
-## 👨‍👩‍👧 Parent API  
+---
+
+## Parent API
+
 ```
 GET /api/parents
 GET /api/parents/:id
@@ -233,7 +313,10 @@ PUT /api/parents/edit/:id
 DELETE /api/parents/delete/:id
 ```
 
-## 📅 Schedule API  
+---
+
+## Schedule API
+
 ```
 GET /api/schedules
 GET /api/schedules/:id
@@ -246,59 +329,54 @@ DELETE /api/schedules/delete/:id
 
 ---
 
-# 🛠️ Troubleshooting
+# 🛠 Troubleshooting
 
-### ❌ Không kết nối được database  
-- Kiểm tra DB trong `.env`  
-- Kiểm tra MySQL service  
-- Kiểm tra quyền user DB  
+### Cannot connect to database
 
-### ❌ Không chạy được server  
-- Kiểm tra lỗi trong terminal  
-- Kiểm tra Node.js version  
-- Cài lại dependencies  
+* Check `.env` configuration
+* Ensure MySQL service is running
+* Verify database credentials
 
-### ❌ API không phản hồi  
-- Test bằng Postman  
-- Kiểm tra console backend  
-- Đảm bảo đúng URL + method  
+### Server cannot start
+
+Check Node version and reinstall dependencies:
+
+```
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### API not responding
+
+* Test API using Postman
+* Check backend console logs
+* Verify request URL and method
 
 ---
 
-# 🔧 Commands hữu ích
+# 🔧 Useful Commands
 
-```sh
-# Kiểm tra port đang sử dụng
+Check if port is used:
+
+```
 netstat -ano | findstr :3000
+```
 
-# Kiểm tra port 5173
-netstat -ano | findstr :5173
+Restart MySQL (Windows):
 
-# Xóa node_modules và cài lại
-rm -rf node_modules package-lock.json
-npm install
-
-# Restart MySQL (Windows)
+```
 net stop mysql80
 net start mysql80
 ```
 
 ---
 
-# 🤝 Đóng góp
+# ⭐ Support
 
-## Quy trình
-1. Fork repo  
-2. Clone về máy  
-3. Tạo branch mới  
-4. Commit với message rõ ràng  
-5. Push và tạo Pull Request  
+If you find this project useful, please consider giving it a **star ⭐ on GitHub**.
 
-## Coding Standards
-- ESLint + Prettier  
-- Tên biến: camelCase  
-- Tên file: kebab-case  
-- Commit tiếng Việt có dấu  
+Repository:
 
----
-
+```
+https://github.com/tuanPeo27/BUS_CODE
+```
